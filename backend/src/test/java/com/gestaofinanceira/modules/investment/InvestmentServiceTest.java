@@ -5,6 +5,7 @@ import com.gestaofinanceira.modules.asset.AssetRepository;
 import com.gestaofinanceira.modules.asset.AssetType;
 import com.gestaofinanceira.modules.market.MarketDataService;
 import com.gestaofinanceira.modules.user.User;
+import com.gestaofinanceira.shared.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,9 +17,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,15 +37,28 @@ class InvestmentServiceTest {
     @Mock
     private MarketDataService marketDataService;
 
+    @Mock
+    private com.gestaofinanceira.modules.account.AccountService accountService;
+
+    @Mock
+    private com.gestaofinanceira.modules.account.AccountRepository accountRepository;
+
     @InjectMocks
     private InvestmentService investmentService;
 
     private User mockUser;
     private Asset petr4;
+    private com.gestaofinanceira.modules.account.Account mockAccount;
 
     @BeforeEach
     void setUp() {
         mockUser = User.builder().id(UUID.randomUUID()).name("Matheus").email("matheus@teste.com").build();
+        mockAccount = com.gestaofinanceira.modules.account.Account.builder()
+                .id(UUID.randomUUID())
+                .user(mockUser)
+                .name("Nubank")
+                .balance(new BigDecimal("5000.00"))
+                .build();
         petr4 = Asset.builder()
                 .id(UUID.randomUUID())
                 .ticker("PETR4")
@@ -142,5 +159,106 @@ class InvestmentServiceTest {
         assertEquals(new BigDecimal("60.0000"), pos.getQuantity());
         assertEquals(new BigDecimal("30.00"), pos.getAveragePrice());
         assertEquals(new BigDecimal("1800.00"), pos.getTotalCost());
+    }
+
+    @Test
+    @DisplayName("Ao comprar ativo (BUY), debita o valor total do investimento da conta escolhida")
+    void testRecordOrderBuyDebitsAccountBalance() {
+        InvestmentDTO.OrderRequest request = new InvestmentDTO.OrderRequest(
+                "PETR4",
+                InvestmentTransactionType.BUY,
+                new BigDecimal("100"),
+                new BigDecimal("35.00"),
+                new BigDecimal("10.00"),
+                LocalDate.now(),
+                mockAccount.getId()
+        );
+
+        when(accountService.findEntityByIdAndUser(mockAccount.getId(), mockUser)).thenReturn(mockAccount);
+        when(marketDataService.getQuote("PETR4")).thenReturn(null);
+        when(assetRepository.findByTickerIgnoreCase("PETR4")).thenReturn(Optional.of(petr4));
+        when(investmentRepository.save(any(InvestmentTransaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        InvestmentDTO.OrderResponse response = investmentService.recordOrder(request, mockUser);
+
+        assertNotNull(response);
+        // Saldo inicial era 5000.00. Custo total = (100 * 35.00) + 10.00 = 3510.00
+        // Saldo final esperado = 5000.00 - 3510.00 = 1490.00
+        assertEquals(new BigDecimal("1490.00"), mockAccount.getBalance());
+        assertEquals(new BigDecimal("3510.00"), response.getTotalAmount());
+        assertEquals(mockAccount.getName(), response.getAccountName());
+        verify(accountRepository).save(mockAccount);
+        verify(investmentRepository).save(any(InvestmentTransaction.class));
+    }
+
+    @Test
+    @DisplayName("Ao vender/resgatar ativo (SELL), credita o valor líquido resgatado na conta escolhida")
+    void testRecordOrderSellCreditsAccountBalance() {
+        InvestmentDTO.OrderRequest request = new InvestmentDTO.OrderRequest(
+                "PETR4",
+                InvestmentTransactionType.SELL,
+                new BigDecimal("50"),
+                new BigDecimal("40.00"),
+                new BigDecimal("5.00"),
+                LocalDate.now(),
+                mockAccount.getId()
+        );
+
+        InvestmentTransaction previousBuy = InvestmentTransaction.builder()
+                .id(UUID.randomUUID())
+                .user(mockUser)
+                .account(mockAccount)
+                .asset(petr4)
+                .type(InvestmentTransactionType.BUY)
+                .quantity(new BigDecimal("100"))
+                .unitPrice(new BigDecimal("35.00"))
+                .fees(BigDecimal.ZERO)
+                .totalAmount(new BigDecimal("3500.00"))
+                .transactionDate(LocalDate.now().minusDays(5))
+                .build();
+
+        when(accountService.findEntityByIdAndUser(mockAccount.getId(), mockUser)).thenReturn(mockAccount);
+        when(marketDataService.getQuote("PETR4")).thenReturn(null);
+        when(assetRepository.findByTickerIgnoreCase("PETR4")).thenReturn(Optional.of(petr4));
+        when(investmentRepository.findByUserAndAssetOrderByTransactionDateAscCreatedAtAsc(mockUser, petr4))
+                .thenReturn(List.of(previousBuy));
+        when(investmentRepository.save(any(InvestmentTransaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        InvestmentDTO.OrderResponse response = investmentService.recordOrder(request, mockUser);
+
+        assertNotNull(response);
+        // Saldo inicial era 5000.00. Valor líquido da venda = (50 * 40.00) - 5.00 = 1995.00
+        // Saldo final esperado = 5000.00 + 1995.00 = 6995.00
+        assertEquals(new BigDecimal("6995.00"), mockAccount.getBalance());
+        assertEquals(new BigDecimal("1995.00"), response.getTotalAmount());
+        assertEquals(mockAccount.getName(), response.getAccountName());
+        verify(accountRepository).save(mockAccount);
+        verify(investmentRepository).save(any(InvestmentTransaction.class));
+    }
+
+    @Test
+    @DisplayName("Ao tentar vender quantidade superior à custódia, deve lançar BusinessException")
+    void testRecordOrderSellThrowsWhenCustodyInsufficient() {
+        InvestmentDTO.OrderRequest request = new InvestmentDTO.OrderRequest(
+                "PETR4",
+                InvestmentTransactionType.SELL,
+                new BigDecimal("50"),
+                new BigDecimal("40.00"),
+                BigDecimal.ZERO,
+                LocalDate.now(),
+                mockAccount.getId()
+        );
+
+        when(accountService.findEntityByIdAndUser(mockAccount.getId(), mockUser)).thenReturn(mockAccount);
+        when(marketDataService.getQuote("PETR4")).thenReturn(null);
+        when(assetRepository.findByTickerIgnoreCase("PETR4")).thenReturn(Optional.of(petr4));
+        when(investmentRepository.findByUserAndAssetOrderByTransactionDateAscCreatedAtAsc(mockUser, petr4))
+                .thenReturn(List.of()); // Custódia zero
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                investmentService.recordOrder(request, mockUser)
+        );
+
+        assertTrue(ex.getMessage().contains("Quantidade insuficiente em custódia"));
     }
 }

@@ -58,6 +58,7 @@ erDiagram
     USERS ||--o{ CATEGORIES : "possui"
     USERS ||--o{ TRANSACTIONS : "realiza"
     USERS ||--o{ INVESTMENT_TRANSACTIONS : "opera"
+    ACCOUNTS ||--o{ INVESTMENT_TRANSACTIONS : "debita_credita"
     
     ACCOUNTS ||--o{ TRANSACTIONS : "origem"
     ACCOUNTS ||--o{ TRANSACTIONS : "destino_transferencia"
@@ -122,6 +123,7 @@ erDiagram
     INVESTMENT_TRANSACTIONS {
         uuid id PK
         uuid user_id FK
+        uuid account_id FK
         uuid asset_id FK
         varchar type
         numeric quantity
@@ -188,6 +190,7 @@ erDiagram
 6. **`investment_transactions`**:
    - `id`: UUID (Primary Key)
    - `user_id`: UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE
+   - `account_id`: UUID REFERENCES accounts(id) ON DELETE SET NULL (Conta de débito/crédito)
    - `asset_id`: UUID NOT NULL REFERENCES assets(id) ON DELETE RESTRICT
    - `type`: VARCHAR(10) NOT NULL (BUY, SELL)
    - `quantity`: NUMERIC(15, 4) NOT NULL CHECK (quantity > 0)
@@ -211,7 +214,15 @@ erDiagram
   $$\Delta Saldo_{Destino} = +Valor$$
 - Edições ou exclusões de transações revertem proporcionalmente o impacto financeiro na respectiva conta.
 
-### 4.2 Preço Médio Ponderado (PM) de Investimentos
+### 4.2 Integração Carteira de Investimentos & Contas Bancárias
+- Ao registrar uma ordem de **COMPRA (BUY)**:
+  $$\Delta Saldo_{Conta} = - TotalInvestido = - ((Q \times Preço) + Taxas)$$
+  O valor sai da conta bancária de origem e ingressa como patrimônio em custódia na carteira de investimentos.
+- Ao registrar uma ordem de **VENDA (SELL)**:
+  $$\Delta Saldo_{Conta} = + MontanteLíquido = + ((Q \times Preço) - Taxas)$$
+  O valor líquido resgatado entra como saldo disponível na conta bancária de destino escolhida.
+
+### 4.3 Preço Médio Ponderado (PM) de Investimentos
 O Preço Médio Ponderado segue o padrão da Receita Federal e B3:
 - **Na COMPRA (BUY)**:
   $$Q_{nova} = Q_{ant} + Q_{compra}$$
@@ -359,6 +370,8 @@ API de Gestão Financeira/
    - Ao comprar 100 cotas de `PETR4` a R$ 35,00 e depois 100 cotas a R$ 40,00, o Preço Médio deve ser exatamente R$ 37,50.
    - Ao consultar cotação externa de R$ 39,00, a rentabilidade percentual calculada deve ser de $+4,00\%$.
    - Não permitir venda com quantidade superior à quantidade em custódia.
+   - Ao comprar ativo (BUY), debitar automaticamente o montante total da conta bancária selecionada.
+   - Ao vender/resgatar ativo (SELL), creditar automaticamente o valor líquido na conta bancária selecionada.
 4. **Dashboard**:
    - Exibir patrimônio total como a soma exata dos saldos em conta mais o valor a mercado dos investimentos.
    - Apresentar gráfico visual de evolução patrimonial e alocação da carteira.

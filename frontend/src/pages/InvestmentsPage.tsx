@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { investmentsApi, marketApi } from '../services/api';
-import type { InvestmentPosition, InvestmentOrder, InvestmentTransactionType, MarketQuote } from '../types';
+import { investmentsApi, marketApi, accountsApi } from '../services/api';
+import type { InvestmentPosition, InvestmentOrder, InvestmentTransactionType, MarketQuote, Account } from '../types';
 import {
   Plus,
   Search,
@@ -11,6 +11,7 @@ import {
 export const InvestmentsPage: React.FC = () => {
   const [positions, setPositions] = useState<InvestmentPosition[]>([]);
   const [orders, setOrders] = useState<InvestmentOrder[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Busca de cotação
@@ -23,6 +24,7 @@ export const InvestmentsPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [orderType, setOrderType] = useState<InvestmentTransactionType>('BUY');
   const [orderTicker, setOrderTicker] = useState('');
+  const [orderAccountId, setOrderAccountId] = useState('');
   const [orderQuantity, setOrderQuantity] = useState('');
   const [orderPrice, setOrderPrice] = useState('');
   const [orderFees, setOrderFees] = useState('0.00');
@@ -32,12 +34,17 @@ export const InvestmentsPage: React.FC = () => {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const [posData, ordData] = await Promise.all([
+      const [posData, ordData, accData] = await Promise.all([
         investmentsApi.getPositions(),
         investmentsApi.listOrders(),
+        accountsApi.list(),
       ]);
       setPositions(posData);
       setOrders(ordData);
+      setAccounts(accData);
+      if (accData.length > 0) {
+        setOrderAccountId((prev) => prev || accData[0].id);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -70,12 +77,19 @@ export const InvestmentsPage: React.FC = () => {
     if (currentPrice) {
       setOrderPrice(currentPrice.toString());
     }
+    if (accounts.length > 0 && !orderAccountId) {
+      setOrderAccountId(accounts[0].id);
+    }
     setIsModalOpen(true);
   };
 
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!orderTicker || !orderQuantity || !orderPrice) return;
+    if (!orderAccountId) {
+      alert('Selecione uma conta bancária para debitar ou creditar os recursos da operação.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -86,6 +100,7 @@ export const InvestmentsPage: React.FC = () => {
         unitPrice: parseFloat(orderPrice),
         fees: parseFloat(orderFees) || 0,
         transactionDate: orderDate,
+        accountId: orderAccountId,
       });
 
       setIsModalOpen(false);
@@ -108,6 +123,13 @@ export const InvestmentsPage: React.FC = () => {
   const totalValue = positions.reduce((acc, p) => acc + Number(p.currentValue), 0);
   const totalProfit = totalValue - totalCost;
   const totalProfitPercentage = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
+
+  const selectedAccount = accounts.find((a) => a.id === orderAccountId);
+  const estimatedGross = (parseFloat(orderQuantity) || 0) * (parseFloat(orderPrice) || 0);
+  const estimatedFees = parseFloat(orderFees) || 0;
+  const estimatedTotal = orderType === 'BUY'
+    ? estimatedGross + estimatedFees
+    : Math.max(0, estimatedGross - estimatedFees);
 
   if (isLoading) {
     return (
@@ -137,6 +159,9 @@ export const InvestmentsPage: React.FC = () => {
           onClick={() => {
             setOrderTicker('');
             setOrderPrice('');
+            if (accounts.length > 0 && !orderAccountId) {
+              setOrderAccountId(accounts[0].id);
+            }
             setIsModalOpen(true);
           }}
           className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white px-4 py-2.5 rounded-xl font-medium shadow-lg shadow-purple-500/20 transition-all cursor-pointer"
@@ -346,6 +371,7 @@ export const InvestmentsPage: React.FC = () => {
                 <tr className="border-b border-slate-800 bg-slate-950/40 text-slate-400 text-xs uppercase font-semibold">
                   <th className="py-3 px-4">Data</th>
                   <th className="py-3 px-4">Ativo</th>
+                  <th className="py-3 px-4">Conta</th>
                   <th className="py-3 px-4">Tipo</th>
                   <th className="py-3 px-4 text-right">Qtd.</th>
                   <th className="py-3 px-4 text-right">Preço Unit.</th>
@@ -360,6 +386,15 @@ export const InvestmentsPage: React.FC = () => {
                       {new Date(ord.transactionDate).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="py-3 px-4 font-bold text-white">{ord.ticker}</td>
+                    <td className="py-3 px-4">
+                      {ord.accountName ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-xs font-medium text-slate-300">
+                          {ord.accountName}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 text-xs">-</span>
+                      )}
+                    </td>
                     <td className="py-3 px-4">
                       <span
                         className={`text-xs font-bold px-2 py-0.5 rounded ${
@@ -419,6 +454,37 @@ export const InvestmentsPage: React.FC = () => {
                     Venda
                   </button>
                 </div>
+              </div>
+
+              {/* Conta Bancária de Débito/Crédito */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">
+                  {orderType === 'BUY' ? 'Conta de Débito (Origem)' : 'Conta de Crédito (Destino)'}
+                </label>
+                {accounts.length === 0 ? (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-xs text-rose-300">
+                    Você ainda não possui conta bancária cadastrada. Crie uma conta antes de operar.
+                  </div>
+                ) : (
+                  <select
+                    required
+                    value={orderAccountId}
+                    onChange={(e) => setOrderAccountId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer"
+                  >
+                    <option value="" disabled>Selecione uma conta bancária</option>
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} — Saldo: {formatCurrency(acc.balance)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <p className="mt-1 text-[11px] text-slate-400">
+                  {orderType === 'BUY'
+                    ? 'O valor total investido será debitado desta conta.'
+                    : 'O valor líquido da venda será creditado no saldo desta conta.'}
+                </p>
               </div>
 
               {/* Ticker */}
@@ -496,16 +562,40 @@ export const InvestmentsPage: React.FC = () => {
                 />
               </div>
 
-              {/* Prévia do Total */}
+              {/* Prévia do Total e Impacto no Saldo */}
               {orderQuantity && orderPrice && (
-                <div className="p-3 rounded-lg bg-slate-850 border border-slate-800 text-xs text-slate-300 flex justify-between">
-                  <span>Total Estimado da Operação:</span>
-                  <span className="font-bold text-white">
-                    {formatCurrency(
-                      parseFloat(orderQuantity) * parseFloat(orderPrice) +
-                        (orderType === 'BUY' ? parseFloat(orderFees || '0') : -parseFloat(orderFees || '0'))
-                    )}
-                  </span>
+                <div className="p-3 rounded-lg bg-slate-850 border border-slate-800 text-xs text-slate-300 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span>Total Estimado da Operação:</span>
+                    <span className="font-bold text-white text-sm">
+                      {formatCurrency(estimatedTotal)}
+                    </span>
+                  </div>
+                  {selectedAccount && (
+                    <div className="pt-2 border-t border-slate-800/80 flex justify-between items-center text-[11px]">
+                      <span className="text-slate-400">
+                        {orderType === 'BUY' ? 'Saldo após débito:' : 'Saldo após crédito:'}
+                      </span>
+                      <span
+                        className={`font-semibold ${
+                          orderType === 'BUY' && selectedAccount.balance < estimatedTotal
+                            ? 'text-amber-400'
+                            : 'text-slate-200'
+                        }`}
+                      >
+                        {formatCurrency(
+                          orderType === 'BUY'
+                            ? selectedAccount.balance - estimatedTotal
+                            : selectedAccount.balance + estimatedTotal
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  {orderType === 'BUY' && selectedAccount && selectedAccount.balance < estimatedTotal && (
+                    <p className="text-[10px] text-amber-400/90 leading-tight">
+                      Atenção: O saldo atual ({formatCurrency(selectedAccount.balance)}) é inferior ao valor da compra.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -520,7 +610,7 @@ export const InvestmentsPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || accounts.length === 0}
                   className="px-5 py-2 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg shadow-md transition-all cursor-pointer disabled:opacity-50"
                 >
                   {isSubmitting ? 'Salvando...' : 'Confirmar Ordem'}

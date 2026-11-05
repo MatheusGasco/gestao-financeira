@@ -16,7 +16,7 @@ import type {
   MonthlyPoint
 } from '../types';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -129,6 +129,7 @@ export const investmentsApi = {
     unitPrice: number;
     fees?: number;
     transactionDate: string;
+    accountId: string;
   }): Promise<InvestmentOrder> => {
     const res = await api.post<InvestmentOrder>('/investments/transactions', data);
     return res.data;

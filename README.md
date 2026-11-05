@@ -25,7 +25,8 @@ Uma plataforma completa, moderna e integrada de **Gestão Financeira Pessoal + A
 
 ### 3. Acompanhamento de Investimentos & Mercado B3
 - **Cotações em tempo real** integradas com a API da **Brapi** (`brapi.dev`) com camada de resiliência e fallback.
-- Registro de ordens de **Compra** e **Venda** de ações, FIIs e ETFs.
+- **Integração com Contas Bancárias**: ordens de compra debitam diretamente o saldo da conta de origem; vendas creditam o montante líquido resgatado na conta de destino.
+- Registro de ordens de **Compra** e **Venda** de ações, FIIs e ETFs com seleção e prévia de impacto no saldo.
 - **Preço Médio Ponderado (PM)** automático com inclusão de taxas e corretagem.
 - **Validação estrita de custódia**: proteção contra vendas descobertas.
 - Cálculo de **Lucro/Prejuízo Líquido** e **Rentabilidade Percentual (%)**.

@@ -1,5 +1,8 @@
 package com.gestaofinanceira.modules.investment;
 
+import com.gestaofinanceira.modules.account.Account;
+import com.gestaofinanceira.modules.account.AccountRepository;
+import com.gestaofinanceira.modules.account.AccountService;
 import com.gestaofinanceira.modules.asset.Asset;
 import com.gestaofinanceira.modules.asset.AssetRepository;
 import com.gestaofinanceira.modules.market.MarketDataService;
@@ -20,20 +23,28 @@ public class InvestmentService {
     private final InvestmentTransactionRepository investmentRepository;
     private final AssetRepository assetRepository;
     private final MarketDataService marketDataService;
+    private final AccountService accountService;
+    private final AccountRepository accountRepository;
 
     public InvestmentService(
             InvestmentTransactionRepository investmentRepository,
             AssetRepository assetRepository,
-            MarketDataService marketDataService
+            MarketDataService marketDataService,
+            AccountService accountService,
+            AccountRepository accountRepository
     ) {
         this.investmentRepository = investmentRepository;
         this.assetRepository = assetRepository;
         this.marketDataService = marketDataService;
+        this.accountService = accountService;
+        this.accountRepository = accountRepository;
     }
 
     @Transactional
     public InvestmentDTO.OrderResponse recordOrder(InvestmentDTO.OrderRequest request, User user) {
         String ticker = request.getTicker().trim().toUpperCase();
+
+        Account account = accountService.findEntityByIdAndUser(request.getAccountId(), user);
 
         // Buscar cotação e garantir existência do ativo
         MarketQuoteDTO quote = marketDataService.getQuote(ticker);
@@ -46,6 +57,9 @@ public class InvestmentService {
 
         if (request.getType() == InvestmentTransactionType.BUY) {
             totalAmount = grossAmount.add(fees);
+            // Sai o valor da conta escolhida para investir
+            account.setBalance(account.getBalance().subtract(totalAmount));
+            accountRepository.save(account);
         } else {
             // Validar se tem custódia suficiente para venda
             BigDecimal currentCustody = getCurrentCustodyQuantity(user, asset);
@@ -56,10 +70,14 @@ public class InvestmentService {
                 ));
             }
             totalAmount = grossAmount.subtract(fees);
+            // Entra o valor resgatado na conta escolhida
+            account.setBalance(account.getBalance().add(totalAmount));
+            accountRepository.save(account);
         }
 
         InvestmentTransaction transaction = InvestmentTransaction.builder()
                 .user(user)
+                .account(account)
                 .asset(asset)
                 .type(request.getType())
                 .quantity(request.getQuantity())

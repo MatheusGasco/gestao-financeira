@@ -8,6 +8,7 @@
 backend/target/
 backend/.mvn/wrapper/maven-wrapper.jar
 backend/*.log
+backend/data/
 
 # Frontend
 frontend/node_modules/

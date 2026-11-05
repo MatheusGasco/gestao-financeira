@@ -67,6 +67,8 @@ export interface InvestmentOrder {
   totalAmount: number;
   transactionDate: string;
   createdAt: string;
+  accountId?: string;
+  accountName?: string;
 }
 
 export interface InvestmentPosition {

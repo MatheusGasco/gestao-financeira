@@ -1,5 +1,6 @@
 package com.gestaofinanceira.modules.investment;
 
+import com.gestaofinanceira.modules.account.Account;
 import com.gestaofinanceira.modules.asset.Asset;
 import com.gestaofinanceira.modules.user.User;
 import jakarta.persistence.*;
@@ -21,6 +22,10 @@ public class InvestmentTransaction {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "account_id")
+    private Account account;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "asset_id", nullable = false)
@@ -51,9 +56,10 @@ public class InvestmentTransaction {
 
     public InvestmentTransaction() {}
 
-    public InvestmentTransaction(UUID id, User user, Asset asset, InvestmentTransactionType type, BigDecimal quantity, BigDecimal unitPrice, BigDecimal fees, BigDecimal totalAmount, LocalDate transactionDate, LocalDateTime createdAt) {
+    public InvestmentTransaction(UUID id, User user, Account account, Asset asset, InvestmentTransactionType type, BigDecimal quantity, BigDecimal unitPrice, BigDecimal fees, BigDecimal totalAmount, LocalDate transactionDate, LocalDateTime createdAt) {
         this.id = id;
         this.user = user;
+        this.account = account;
         this.asset = asset;
         this.type = type;
         this.quantity = quantity;
@@ -64,6 +70,10 @@ public class InvestmentTransaction {
         this.createdAt = createdAt;
     }
 
+    public InvestmentTransaction(UUID id, User user, Asset asset, InvestmentTransactionType type, BigDecimal quantity, BigDecimal unitPrice, BigDecimal fees, BigDecimal totalAmount, LocalDate transactionDate, LocalDateTime createdAt) {
+        this(id, user, null, asset, type, quantity, unitPrice, fees, totalAmount, transactionDate, createdAt);
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -71,6 +81,7 @@ public class InvestmentTransaction {
     public static class Builder {
         private UUID id;
         private User user;
+        private Account account;
         private Asset asset;
         private InvestmentTransactionType type;
         private BigDecimal quantity;
@@ -82,6 +93,7 @@ public class InvestmentTransaction {
 
         public Builder id(UUID id) { this.id = id; return this; }
         public Builder user(User user) { this.user = user; return this; }
+        public Builder account(Account account) { this.account = account; return this; }
         public Builder asset(Asset asset) { this.asset = asset; return this; }
         public Builder type(InvestmentTransactionType type) { this.type = type; return this; }
         public Builder quantity(BigDecimal quantity) { this.quantity = quantity; return this; }
@@ -92,7 +104,7 @@ public class InvestmentTransaction {
         public Builder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
 
         public InvestmentTransaction build() {
-            return new InvestmentTransaction(id, user, asset, type, quantity, unitPrice, fees, totalAmount, transactionDate, createdAt);
+            return new InvestmentTransaction(id, user, account, asset, type, quantity, unitPrice, fees, totalAmount, transactionDate, createdAt);
         }
     }
 
@@ -101,6 +113,9 @@ public class InvestmentTransaction {
 
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }
+
+    public Account getAccount() { return account; }
+    public void setAccount(Account account) { this.account = account; }
 
     public Asset getAsset() { return asset; }
     public void setAsset(Asset asset) { this.asset = asset; }

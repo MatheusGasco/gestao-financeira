@@ -32,15 +32,23 @@ public class InvestmentDTO {
         @NotNull(message = "A data da operação é obrigatória")
         private LocalDate transactionDate;
 
+        @NotNull(message = "A conta bancária é obrigatória")
+        private UUID accountId;
+
         public OrderRequest() {}
 
-        public OrderRequest(String ticker, InvestmentTransactionType type, BigDecimal quantity, BigDecimal unitPrice, BigDecimal fees, LocalDate transactionDate) {
+        public OrderRequest(String ticker, InvestmentTransactionType type, BigDecimal quantity, BigDecimal unitPrice, BigDecimal fees, LocalDate transactionDate, UUID accountId) {
             this.ticker = ticker;
             this.type = type;
             this.quantity = quantity;
             this.unitPrice = unitPrice;
             this.fees = fees;
             this.transactionDate = transactionDate;
+            this.accountId = accountId;
+        }
+
+        public OrderRequest(String ticker, InvestmentTransactionType type, BigDecimal quantity, BigDecimal unitPrice, BigDecimal fees, LocalDate transactionDate) {
+            this(ticker, type, quantity, unitPrice, fees, transactionDate, null);
         }
 
         public String getTicker() { return ticker; }
@@ -60,6 +68,9 @@ public class InvestmentDTO {
 
         public LocalDate getTransactionDate() { return transactionDate; }
         public void setTransactionDate(LocalDate transactionDate) { this.transactionDate = transactionDate; }
+
+        public UUID getAccountId() { return accountId; }
+        public void setAccountId(UUID accountId) { this.accountId = accountId; }
     }
 
     public static class OrderResponse {
@@ -74,10 +85,12 @@ public class InvestmentDTO {
         private BigDecimal totalAmount;
         private LocalDate transactionDate;
         private LocalDateTime createdAt;
+        private UUID accountId;
+        private String accountName;
 
         public OrderResponse() {}
 
-        public OrderResponse(UUID id, String ticker, String assetName, AssetType assetType, InvestmentTransactionType type, BigDecimal quantity, BigDecimal unitPrice, BigDecimal fees, BigDecimal totalAmount, LocalDate transactionDate, LocalDateTime createdAt) {
+        public OrderResponse(UUID id, String ticker, String assetName, AssetType assetType, InvestmentTransactionType type, BigDecimal quantity, BigDecimal unitPrice, BigDecimal fees, BigDecimal totalAmount, LocalDate transactionDate, LocalDateTime createdAt, UUID accountId, String accountName) {
             this.id = id;
             this.ticker = ticker;
             this.assetName = assetName;
@@ -89,9 +102,17 @@ public class InvestmentDTO {
             this.totalAmount = totalAmount;
             this.transactionDate = transactionDate;
             this.createdAt = createdAt;
+            this.accountId = accountId;
+            this.accountName = accountName;
+        }
+
+        public OrderResponse(UUID id, String ticker, String assetName, AssetType assetType, InvestmentTransactionType type, BigDecimal quantity, BigDecimal unitPrice, BigDecimal fees, BigDecimal totalAmount, LocalDate transactionDate, LocalDateTime createdAt) {
+            this(id, ticker, assetName, assetType, type, quantity, unitPrice, fees, totalAmount, transactionDate, createdAt, null, null);
         }
 
         public static OrderResponse fromEntity(InvestmentTransaction t) {
+            UUID accId = t.getAccount() != null ? t.getAccount().getId() : null;
+            String accName = t.getAccount() != null ? t.getAccount().getName() : null;
             return new OrderResponse(
                     t.getId(),
                     t.getAsset().getTicker(),
@@ -103,7 +124,9 @@ public class InvestmentDTO {
                     t.getFees(),
                     t.getTotalAmount(),
                     t.getTransactionDate(),
-                    t.getCreatedAt()
+                    t.getCreatedAt(),
+                    accId,
+                    accName
             );
         }
 
@@ -139,6 +162,12 @@ public class InvestmentDTO {
 
         public LocalDateTime getCreatedAt() { return createdAt; }
         public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+        public UUID getAccountId() { return accountId; }
+        public void setAccountId(UUID accountId) { this.accountId = accountId; }
+
+        public String getAccountName() { return accountName; }
+        public void setAccountName(String accountName) { this.accountName = accountName; }
     }
 
     public static class PositionResponse {
