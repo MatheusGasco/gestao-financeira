@@ -6,7 +6,17 @@ import {
   Search,
   Briefcase,
   Clock,
+  PieChart as PieIcon,
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+} from 'recharts';
+
+const ASSET_COLORS = ['#8B5CF6', '#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#06B6D4'];
 
 export const InvestmentsPage: React.FC = () => {
   const [positions, setPositions] = useState<InvestmentPosition[]>([]);
@@ -131,6 +141,24 @@ export const InvestmentsPage: React.FC = () => {
     ? estimatedGross + estimatedFees
     : Math.max(0, estimatedGross - estimatedFees);
 
+  // Alocação de ativos por classe
+  const allocationByType = positions.reduce((acc: { [key: string]: number }, pos) => {
+    acc[pos.type] = (acc[pos.type] || 0) + Number(pos.currentValue);
+    return acc;
+  }, {});
+
+  const totalPositionsValue = positions.reduce((acc, p) => acc + Number(p.currentValue), 0);
+
+  const assetAllocationData = Object.entries(allocationByType).map(([rawType, val]) => {
+    const label = rawType === 'STOCK' ? 'Ações' : rawType === 'FII' ? 'Fundos Imob.' : rawType === 'ETF' ? 'ETFs' : rawType;
+    const percentage = totalPositionsValue > 0 ? (val / totalPositionsValue) * 100 : 0;
+    return {
+      name: label,
+      value: val,
+      percentage,
+    };
+  }).sort((a, b) => b.value - a.value);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -206,72 +234,144 @@ export const InvestmentsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Caixa de Busca de Cotação da B3 */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 p-6 rounded-2xl border border-slate-800 shadow-lg">
-        <h2 className="text-base font-bold text-white mb-2 flex items-center gap-2">
-          <Search className="w-5 h-5 text-blue-400" />
-          Consultar Cotação B3 (Brapi)
-        </h2>
-        <p className="text-xs text-slate-400 mb-4">
-          Digite o código de qualquer ação, FII ou ETF (ex: PETR4, VALE3, MXRF11, IVVB11, WEGE3)
-        </p>
+      {/* Seção: Alocação de Ativos & Consulta de Cotações B3 */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Gráfico de Alocação de Ativos */}
+        <div className="lg:col-span-5 bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-md flex flex-col justify-between">
+          <div>
+            <h2 className="text-base font-bold text-white mb-1 flex items-center gap-2">
+              <PieIcon className="w-5 h-5 text-purple-400" />
+              Alocação da Carteira
+            </h2>
+            <p className="text-xs text-slate-400">
+              Distribuição percentual do patrimônio em custódia por classe de ativo
+            </p>
+          </div>
 
-        <form onSubmit={handleSearchQuote} className="flex gap-2 max-w-md">
-          <input
-            type="text"
-            placeholder="Ex: PETR4"
-            value={searchTicker}
-            onChange={(e) => setSearchTicker(e.target.value.toUpperCase())}
-            className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm font-semibold tracking-wider text-white uppercase placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            disabled={isSearchingQuote}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold transition-all cursor-pointer disabled:opacity-50"
-          >
-            {isSearchingQuote ? 'Buscando...' : 'Consultar'}
-          </button>
-        </form>
-
-        {searchError && (
-          <p className="mt-3 text-xs text-rose-400">{searchError}</p>
-        )}
-
-        {searchedQuote && (
-          <div className="mt-4 p-4 rounded-xl bg-slate-800/80 border border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-bold text-white">{searchedQuote.ticker}</span>
-                <span className="text-xs text-slate-400">{searchedQuote.name}</span>
-                {searchedQuote.fromFallback && (
-                  <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
-                    Referência local
-                  </span>
-                )}
+          {assetAllocationData.length > 0 ? (
+            <div className="flex flex-col mt-3">
+              <div className="h-44 w-full flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={assetAllocationData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={70}
+                      paddingAngle={4}
+                      dataKey="value"
+                    >
+                      {assetAllocationData.map((_, index) => (
+                        <Cell key={`asset-cell-${index}`} fill={ASSET_COLORS[index % ASSET_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#0F172A', borderColor: '#334155', borderRadius: '12px', fontSize: '12px' }}
+                      formatter={(val: any, _name: any, item: any) => [
+                        `${formatCurrency(Number(val))} (${item.payload.percentage.toFixed(1)}%)`,
+                        item.payload.name
+                      ]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-              <div className="flex items-center gap-3 mt-1">
-                <span className="text-xl font-extrabold text-white">
-                  {formatCurrency(searchedQuote.price)}
-                </span>
-                <span
-                  className={`text-xs font-semibold flex items-center ${
-                    searchedQuote.changePercentage >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                  }`}
-                >
-                  {searchedQuote.changePercentage >= 0 ? '+' : ''}
-                  {searchedQuote.changePercentage.toFixed(2)}%
-                </span>
+
+              {/* Legenda com Porcentagens dos Itens */}
+              <div className="mt-3 space-y-2 max-h-36 overflow-y-auto pr-1">
+                {assetAllocationData.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-800/60 border border-slate-800">
+                    <div className="flex items-center gap-2 truncate pr-2">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: ASSET_COLORS[index % ASSET_COLORS.length] }}
+                      />
+                      <span className="text-slate-300 font-medium truncate">{item.name}</span>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-white font-semibold">{formatCurrency(item.value)}</span>
+                      <span className="text-purple-400 ml-1.5 font-bold">({item.percentage.toFixed(1)}%)</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
+          ) : (
+            <div className="text-center text-slate-500 text-xs py-10">
+              Nenhum ativo em carteira.<br />Cadastre suas compras na B3 para visualizar a distribuição.
+            </div>
+          )}
+        </div>
 
-            <button
-              onClick={() => handleOpenOrderModalWithTicker(searchedQuote.ticker, searchedQuote.price)}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-md transition-all cursor-pointer"
-            >
-              Comprar / Vender este Ativo
-            </button>
+        {/* Caixa de Busca de Cotação da B3 */}
+        <div className="lg:col-span-7 bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 p-6 rounded-2xl border border-slate-800 shadow-lg flex flex-col justify-between">
+          <div>
+            <h2 className="text-base font-bold text-white mb-2 flex items-center gap-2">
+              <Search className="w-5 h-5 text-blue-400" />
+              Consultar Cotação B3 (Brapi)
+            </h2>
+            <p className="text-xs text-slate-400 mb-4">
+              Digite o código de qualquer ação, FII ou ETF (ex: PETR4, VALE3, MXRF11, IVVB11, WEGE3)
+            </p>
+
+            <form onSubmit={handleSearchQuote} className="flex gap-2 max-w-md">
+              <input
+                type="text"
+                placeholder="Ex: PETR4"
+                value={searchTicker}
+                onChange={(e) => setSearchTicker(e.target.value.toUpperCase())}
+                className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm font-semibold tracking-wider text-white uppercase placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="submit"
+                disabled={isSearchingQuote}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isSearchingQuote ? 'Buscando...' : 'Consultar'}
+              </button>
+            </form>
+
+            {searchError && (
+              <p className="mt-3 text-xs text-rose-400">{searchError}</p>
+            )}
           </div>
-        )}
+
+          {searchedQuote && (
+            <div className="mt-4 p-4 rounded-xl bg-slate-800/80 border border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-bold text-white">{searchedQuote.ticker}</span>
+                  <span className="text-xs text-slate-400">{searchedQuote.name}</span>
+                  {searchedQuote.fromFallback && (
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                      Referência local
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-xl font-extrabold text-white">
+                    {formatCurrency(searchedQuote.price)}
+                  </span>
+                  <span
+                    className={`text-xs font-semibold flex items-center ${
+                      searchedQuote.changePercentage >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {searchedQuote.changePercentage >= 0 ? '+' : ''}
+                    {searchedQuote.changePercentage.toFixed(2)}%
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleOpenOrderModalWithTicker(searchedQuote.ticker, searchedQuote.price)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-md transition-all cursor-pointer"
+              >
+                Comprar / Vender este Ativo
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tabela de Posições em Carteira */}

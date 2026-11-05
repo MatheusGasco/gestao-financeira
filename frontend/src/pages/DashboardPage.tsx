@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { dashboardApi } from '../services/api';
-import type { DashboardSummary, MonthlyPoint } from '../types';
+import { dashboardApi, transactionsApi } from '../services/api';
+import type { DashboardSummary, Transaction } from '../types';
 import {
   Wallet,
   TrendingUp,
@@ -15,35 +15,32 @@ import {
 } from 'lucide-react';
 import {
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
   PieChart,
   Pie,
   Cell,
+  Tooltip,
 } from 'recharts';
 
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4'];
+const DEBIT_PALETTE = ['#EF4444', '#F97316', '#F59E0B', '#EC4899', '#8B5CF6', '#6366F1', '#14B8A6'];
+const CREDIT_PALETTE = ['#10B981', '#059669', '#34D399', '#06B6D4', '#3B82F6', '#8B5CF6', '#F59E0B'];
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [evolution, setEvolution] = useState<MonthlyPoint[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [periodFilter, setPeriodFilter] = useState<'ALL' | 'CURRENT_MONTH'>('ALL');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const [sumData, evoData] = await Promise.all([
+      const [sumData, txData] = await Promise.all([
         dashboardApi.getSummary(),
-        dashboardApi.getEvolution(),
+        transactionsApi.list(),
       ]);
       setSummary(sumData);
-      setEvolution(evoData);
+      setTransactions(txData);
     } catch {
       setError('Não foi possível carregar os dados do dashboard.');
     } finally {
@@ -82,16 +79,56 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
-  // Prepara dados de pizza por tipo de ativo
-  const allocationByType = summary.positions.reduce((acc: { [key: string]: number }, pos) => {
-    acc[pos.type] = (acc[pos.type] || 0) + Number(pos.currentValue);
-    return acc;
-  }, {});
+  const currentMonthPrefix = new Date().toISOString().slice(0, 7);
 
-  const pieData = Object.entries(allocationByType).map(([name, value]) => ({
-    name: name === 'STOCK' ? 'Ações' : name === 'FII' ? 'Fundos Imob.' : name,
-    value,
-  }));
+  const activeTransactions = transactions.filter((tx) => {
+    if (periodFilter === 'CURRENT_MONTH') {
+      return tx.transactionDate && tx.transactionDate.startsWith(currentMonthPrefix);
+    }
+    return true;
+  });
+
+  // Débitos (Despesas) por Categoria
+  const expenseTxs = activeTransactions.filter((tx) => tx.type === 'EXPENSE');
+  const totalExpense = expenseTxs.reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+  const expenseMap: { [catName: string]: { name: string; value: number; color?: string } } = {};
+  expenseTxs.forEach((tx) => {
+    const name = tx.category?.name || 'Sem Categoria';
+    const color = tx.category?.color;
+    if (!expenseMap[name]) {
+      expenseMap[name] = { name, value: 0, color };
+    }
+    expenseMap[name].value += Number(tx.amount);
+  });
+
+  const expensePieData = Object.values(expenseMap).map((item, idx) => ({
+    name: item.name,
+    value: item.value,
+    color: item.color || DEBIT_PALETTE[idx % DEBIT_PALETTE.length],
+    percentage: totalExpense > 0 ? (item.value / totalExpense) * 100 : 0,
+  })).sort((a, b) => b.value - a.value);
+
+  // Créditos (Receitas) por Categoria
+  const incomeTxs = activeTransactions.filter((tx) => tx.type === 'INCOME');
+  const totalIncome = incomeTxs.reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+  const incomeMap: { [catName: string]: { name: string; value: number; color?: string } } = {};
+  incomeTxs.forEach((tx) => {
+    const name = tx.category?.name || 'Sem Categoria';
+    const color = tx.category?.color;
+    if (!incomeMap[name]) {
+      incomeMap[name] = { name, value: 0, color };
+    }
+    incomeMap[name].value += Number(tx.amount);
+  });
+
+  const incomePieData = Object.values(incomeMap).map((item, idx) => ({
+    name: item.name,
+    value: item.value,
+    color: item.color || CREDIT_PALETTE[idx % CREDIT_PALETTE.length],
+    percentage: totalIncome > 0 ? (item.value / totalIncome) * 100 : 0,
+  })).sort((a, b) => b.value - a.value);
 
   return (
     <div className="space-y-8 pb-12">
@@ -198,68 +235,180 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Evolução Financeira */}
-        <div className="lg:col-span-2 bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-md">
-          <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-blue-400" />
-            Evolução de Fluxo de Caixa
-          </h2>
-          <p className="text-xs text-slate-400 mb-6">Receitas vs. Despesas nos últimos meses</p>
+      {/* Seção de Gráficos: Débitos e Créditos por Categoria */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+          <div>
+            <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+              <PieIcon className="w-5 h-5 text-blue-400" />
+              Distribuição por Categoria
+            </h2>
+            <p className="text-xs text-slate-400">
+              Detalhamento de cada débito (gasto) e crédito (receita) registrado em transações
+            </p>
+          </div>
 
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={evolution} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <XAxis dataKey="month" stroke="#64748B" fontSize={12} tickLine={false} />
-                <YAxis stroke="#64748B" fontSize={12} tickLine={false} tickFormatter={(v) => `R$${v}`} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#0F172A', borderColor: '#334155', borderRadius: '12px', fontSize: '12px' }}
-                  formatter={(value: any) => [formatCurrency(Number(value)), '']}
-                />
-                <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }} />
-                <Bar dataKey="income" name="Receitas" fill="#10B981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expense" name="Despesas" fill="#EF4444" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="flex items-center bg-slate-800/90 p-1 rounded-xl border border-slate-700/80 text-xs font-semibold self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setPeriodFilter('ALL')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                periodFilter === 'ALL'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Todo o Período
+            </button>
+            <button
+              type="button"
+              onClick={() => setPeriodFilter('CURRENT_MONTH')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                periodFilter === 'CURRENT_MONTH'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Mês Atual
+            </button>
           </div>
         </div>
 
-        {/* Alocação da Carteira */}
-        <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-md flex flex-col">
-          <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-            <PieIcon className="w-5 h-5 text-purple-400" />
-            Alocação de Ativos
-          </h2>
-          <p className="text-xs text-slate-400 mb-6">Distribuição da custódia por classe</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Gráfico 1: Débitos / Gastos por Categoria */}
+          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-md flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <ArrowDownRight className="w-5 h-5 text-rose-400" />
+                  Débitos por Categoria (Despesas)
+                </h3>
+                <span className="text-xs font-extrabold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg">
+                  Total: {formatCurrency(totalExpense)}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Onde o seu dinheiro foi gasto nas transações
+              </p>
+            </div>
 
-          <div className="flex-1 flex items-center justify-center min-h-[220px]">
-            {pieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={80}
-                    paddingAngle={4}
-                    dataKey="value"
-                  >
-                    {pieData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#0F172A', borderColor: '#334155', borderRadius: '12px', fontSize: '12px' }}
-                    formatter={(val: any) => [formatCurrency(Number(val)), '']}
-                  />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
-                </PieChart>
-              </ResponsiveContainer>
+            {expensePieData.length > 0 ? (
+              <div className="flex flex-col mt-4">
+                <div className="h-52 w-full flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={expensePieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={80}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {expensePieData.map((entry, index) => (
+                          <Cell key={`expense-cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#0F172A', borderColor: '#334155', borderRadius: '12px', fontSize: '12px' }}
+                        formatter={(val: any, _name: any, item: any) => [
+                          `${formatCurrency(Number(val))} (${item.payload.percentage.toFixed(1)}%)`,
+                          item.payload.name
+                        ]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Legenda com as Porcentagens de cada Item */}
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
+                  {expensePieData.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-800/60 border border-slate-800">
+                      <div className="flex items-center gap-2 truncate pr-2">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                        <span className="text-slate-300 font-medium truncate">{item.name}</span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-white font-semibold">{formatCurrency(item.value)}</span>
+                        <span className="text-rose-400 ml-1.5 font-bold">({item.percentage.toFixed(1)}%)</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
-              <div className="text-center text-slate-500 text-xs py-8">
-                Nenhum ativo em carteira ainda.<br />Cadastre compras no módulo de Investimentos.
+              <div className="text-center text-slate-500 text-xs py-14">
+                Nenhum débito ou despesa registrado no período selecionado.
+              </div>
+            )}
+          </div>
+
+          {/* Gráfico 2: Créditos / Receitas por Categoria */}
+          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-md flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <ArrowUpRight className="w-5 h-5 text-emerald-400" />
+                  Créditos por Categoria (Receitas)
+                </h3>
+                <span className="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                  Total: {formatCurrency(totalIncome)}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Origem e fontes dos créditos registrados
+              </p>
+            </div>
+
+            {incomePieData.length > 0 ? (
+              <div className="flex flex-col mt-4">
+                <div className="h-52 w-full flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={incomePieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={80}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {incomePieData.map((entry, index) => (
+                          <Cell key={`income-cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#0F172A', borderColor: '#334155', borderRadius: '12px', fontSize: '12px' }}
+                        formatter={(val: any, _name: any, item: any) => [
+                          `${formatCurrency(Number(val))} (${item.payload.percentage.toFixed(1)}%)`,
+                          item.payload.name
+                        ]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Legenda com as Porcentagens de cada Item */}
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
+                  {incomePieData.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-800/60 border border-slate-800">
+                      <div className="flex items-center gap-2 truncate pr-2">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                        <span className="text-slate-300 font-medium truncate">{item.name}</span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-white font-semibold">{formatCurrency(item.value)}</span>
+                        <span className="text-emerald-400 ml-1.5 font-bold">({item.percentage.toFixed(1)}%)</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center text-slate-500 text-xs py-14">
+                Nenhum crédito ou receita registrado no período selecionado.
               </div>
             )}
           </div>
