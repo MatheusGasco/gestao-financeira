@@ -6,15 +6,16 @@ import com.gestaofinanceira.modules.asset.AssetType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -30,24 +31,8 @@ public class MarketDataService {
     @Value("${brapi.token:}")
     private String brapiToken;
 
-    private static final Map<String, BigDecimal> MOCK_PRICES = new HashMap<>();
-
-    static {
-        MOCK_PRICES.put("PETR4", new BigDecimal("38.50"));
-        MOCK_PRICES.put("VALE3", new BigDecimal("62.30"));
-        MOCK_PRICES.put("ITUB4", new BigDecimal("35.75"));
-        MOCK_PRICES.put("BBDC4", new BigDecimal("14.20"));
-        MOCK_PRICES.put("BBAS3", new BigDecimal("28.90"));
-        MOCK_PRICES.put("WEGE3", new BigDecimal("54.10"));
-        MOCK_PRICES.put("MGLU3", new BigDecimal("9.80"));
-        MOCK_PRICES.put("MXRF11", new BigDecimal("10.45"));
-        MOCK_PRICES.put("HGLG11", new BigDecimal("165.20"));
-        MOCK_PRICES.put("KNIP11", new BigDecimal("94.30"));
-        MOCK_PRICES.put("XPML11", new BigDecimal("112.50"));
-        MOCK_PRICES.put("IVVB11", new BigDecimal("325.40"));
-        MOCK_PRICES.put("BOVA11", new BigDecimal("128.60"));
-        MOCK_PRICES.put("SMAL11", new BigDecimal("104.20"));
-    }
+    @Value("${brapi.cache-ttl-seconds:300}")
+    private long cacheTtlSeconds;
 
     public MarketDataService(AssetRepository assetRepository) {
         this.assetRepository = assetRepository;
@@ -55,83 +40,143 @@ public class MarketDataService {
 
     @Transactional
     public MarketQuoteDTO getQuote(String ticker) {
+        if (ticker == null || ticker.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Informe o código do ativo."
+            );
+        }
+
         String cleanTicker = ticker.trim().toUpperCase();
 
-        try {
-            RestClient restClient = RestClient.builder().baseUrl(brapiBaseUrl).build();
-            String uri = "/quote/" + cleanTicker;
-            if (brapiToken != null && !brapiToken.isBlank()) {
-                uri += "?token=" + brapiToken;
+        Optional<Asset> existingOpt =
+                assetRepository.findByTickerIgnoreCase(cleanTicker);
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if (existingOpt.isPresent()) {
+            Asset existing = existingOpt.get();
+
+            if (existing.getCurrentPrice() != null
+                    && existing.getCurrentPrice().compareTo(BigDecimal.ZERO) > 0
+                    && existing.getLastPriceUpdate() != null
+                    && cacheTtlSeconds > 0
+                    && existing.getLastPriceUpdate().isAfter(
+                            now.minusSeconds(cacheTtlSeconds))) {
+
+                log.info("Cotação {} recuperada do cache.", cleanTicker);
+                return buildQuote(existing, false);
             }
+        }
+
+        try {
+            RestClient restClient = RestClient.builder()
+                    .baseUrl(brapiBaseUrl)
+                    .build();
 
             BrapiResponse response = restClient.get()
-                    .uri(uri)
+                    .uri(uriBuilder -> {
+                        var builder = uriBuilder.path("/quote/{ticker}");
+
+                        if (brapiToken != null && !brapiToken.isBlank()) {
+                            builder.queryParam("token", brapiToken);
+                        }
+
+                        return builder.build(cleanTicker);
+                    })
                     .retrieve()
                     .body(BrapiResponse.class);
 
-            if (response != null && response.getResults() != null && !response.getResults().isEmpty()) {
+            if (response != null
+                    && response.getResults() != null
+                    && !response.getResults().isEmpty()) {
+
                 BrapiResponse.Result result = response.getResults().get(0);
-                if (result.getRegularMarketPrice() != null) {
+
+                if (result.getRegularMarketPrice() != null
+                        && result.getRegularMarketPrice()
+                        .compareTo(BigDecimal.ZERO) > 0) {
+
                     BigDecimal price = result.getRegularMarketPrice();
-                    BigDecimal change = result.getRegularMarketChangePercent() != null
-                            ? result.getRegularMarketChangePercent()
-                            : BigDecimal.ZERO;
-                    String name = result.getLongName() != null ? result.getLongName() :
-                            (result.getShortName() != null ? result.getShortName() : cleanTicker);
 
-                    Asset asset = updateOrCreateAsset(cleanTicker, name, price, change);
+                    BigDecimal change =
+                            result.getRegularMarketChangePercent() != null
+                                    ? result.getRegularMarketChangePercent()
+                                    : BigDecimal.ZERO;
 
-                    return MarketQuoteDTO.builder()
-                            .ticker(asset.getTicker())
-                            .name(asset.getName())
-                            .price(price)
-                            .changePercentage(change)
-                            .updatedAt(asset.getLastPriceUpdate())
-                            .fromFallback(false)
-                            .build();
+                    String name = result.getLongName() != null
+                            ? result.getLongName()
+                            : result.getShortName() != null
+                            ? result.getShortName()
+                            : cleanTicker;
+
+                    Asset asset = updateOrCreateAsset(
+                            cleanTicker, name, price, change
+                    );
+
+                    log.info("Cotação {} atualizada pela Brapi.", cleanTicker);
+                    return buildQuote(asset, false);
                 }
             }
-        } catch (Exception e) {
-            log.warn("Falha ao consultar Brapi para ticker {}: {}. Utilizando estratégia de fallback.", cleanTicker, e.getMessage());
+
+            log.warn("Brapi não retornou cotação válida para {}.", cleanTicker);
+
+        } catch (RestClientException e) {
+            log.warn(
+                    "Falha ao consultar Brapi para {}: {}",
+                    cleanTicker, e.getMessage()
+            );
         }
 
         return getFallbackQuote(cleanTicker);
     }
 
-    @Transactional
-    public MarketQuoteDTO getFallbackQuote(String cleanTicker) {
-        Optional<Asset> existingOpt = assetRepository.findByTickerIgnoreCase(cleanTicker);
+    private MarketQuoteDTO getFallbackQuote(String ticker) {
+        Optional<Asset> existingOpt =
+                assetRepository.findByTickerIgnoreCase(ticker);
 
-        BigDecimal price;
-        BigDecimal change = new BigDecimal("0.75");
-        String name = cleanTicker;
+        if (existingOpt.isPresent()) {
+            Asset asset = existingOpt.get();
 
-        if (existingOpt.isPresent() && existingOpt.get().getCurrentPrice().compareTo(BigDecimal.ZERO) > 0) {
-            Asset existing = existingOpt.get();
-            price = existing.getCurrentPrice();
-            change = existing.getDailyChangePercentage();
-            name = existing.getName();
-        } else if (MOCK_PRICES.containsKey(cleanTicker)) {
-            price = MOCK_PRICES.get(cleanTicker);
-            name = cleanTicker + " Cotação Referência";
-        } else {
-            price = new BigDecimal("50.00");
-            name = cleanTicker + " Ativo B3";
+            if (asset.getCurrentPrice() != null
+                    && asset.getCurrentPrice().compareTo(BigDecimal.ZERO) > 0) {
+
+                log.warn(
+                        "Utilizando última cotação armazenada para {}.",
+                        ticker
+                );
+
+                return buildQuote(asset, true);
+            }
         }
 
-        Asset asset = updateOrCreateAsset(cleanTicker, name, price, change);
+        throw new ResponseStatusException(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Não foi possível obter a cotação de " + ticker
+                        + ". Nenhuma cotação válida está armazenada."
+        );
+    }
 
+    private MarketQuoteDTO buildQuote(Asset asset, boolean fromFallback) {
         return MarketQuoteDTO.builder()
                 .ticker(asset.getTicker())
                 .name(asset.getName())
-                .price(price)
-                .changePercentage(change)
-                .updatedAt(LocalDateTime.now())
-                .fromFallback(true)
+                .price(asset.getCurrentPrice())
+                .changePercentage(
+                        asset.getDailyChangePercentage() != null
+                                ? asset.getDailyChangePercentage()
+                                : BigDecimal.ZERO
+                )
+                .updatedAt(asset.getLastPriceUpdate())
+                .fromFallback(fromFallback)
                 .build();
     }
 
-    private Asset updateOrCreateAsset(String ticker, String name, BigDecimal price, BigDecimal change) {
+    private Asset updateOrCreateAsset(
+            String ticker,
+            String name,
+            BigDecimal price,
+            BigDecimal change
+    ) {
         Asset asset = assetRepository.findByTickerIgnoreCase(ticker)
                 .orElseGet(() -> Asset.builder()
                         .ticker(ticker)
@@ -140,17 +185,25 @@ public class MarketDataService {
                         .build());
 
         asset.setCurrentPrice(price.setScale(4, RoundingMode.HALF_UP));
-        asset.setDailyChangePercentage(change.setScale(4, RoundingMode.HALF_UP));
+        asset.setDailyChangePercentage(
+                change.setScale(4, RoundingMode.HALF_UP)
+        );
+
         if (asset.getName() == null || asset.getName().isBlank()) {
             asset.setName(name);
         }
+
         asset.setLastPriceUpdate(LocalDateTime.now());
+
         return assetRepository.save(asset);
     }
 
     public static AssetType inferAssetType(String ticker) {
         if (ticker.endsWith("11")) {
-            if (ticker.startsWith("IVVB") || ticker.startsWith("BOVA") || ticker.startsWith("SMAL") || ticker.startsWith("HASH")) {
+            if (ticker.startsWith("IVVB")
+                    || ticker.startsWith("BOVA")
+                    || ticker.startsWith("SMAL")
+                    || ticker.startsWith("HASH")) {
                 return AssetType.ETF;
             }
             return AssetType.FII;
