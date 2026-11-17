@@ -51,12 +51,36 @@ export const authApi = {
     const res = await api.post<AuthResponse>('/auth/login', { email, password });
     return res.data;
   },
-  register: async (name: string, email: string, password: string): Promise<AuthResponse> => {
-    const res = await api.post<AuthResponse>('/auth/register', { name, email, password });
+
+  googleLogin: async (credential: string): Promise<AuthResponse> => {
+    const res = await api.post<AuthResponse>('/auth/google', { credential });
     return res.data;
   },
+
+  register: async (name: string, email: string, password: string): Promise<{ message: string }> => {
+    const res = await api.post<{ message: string }>('/auth/register', { name, email, password });
+    return res.data;
+  },
+
   getMe: async (): Promise<User> => {
     const res = await api.get<User>('/auth/me');
+    return res.data;
+  },
+
+  verifyEmail: async (token: string): Promise<{ message: string }> => {
+    const res = await api.post<{ message: string }>('/auth/verify-email', { token });
+    return res.data;
+  },
+  requestPasswordReset: async (email: string): Promise<{ message: string }> => {
+    const res = await api.post<{ message: string }>('/auth/password-reset/request', { email });
+    return res.data;
+  },
+
+  confirmPasswordReset: async (token: string, newPassword: string): Promise<{ message: string }> => {
+    const res = await api.post<{ message: string }>('/auth/password-reset/confirm', {
+      token,
+      newPassword
+    });
     return res.data;
   },
 };

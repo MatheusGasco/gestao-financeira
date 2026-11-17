@@ -1,3 +1,4 @@
+
 package com.gestaofinanceira.modules.user;
 
 import jakarta.persistence.*;
@@ -26,12 +27,18 @@ public class User implements UserDetails {
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
+    @Column(unique = true, length = 255)
+    private String googleId;
+
     @Column(nullable = false)
     private String password;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role = Role.ROLE_USER;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private Boolean emailVerified = true;
 
     @CreationTimestamp
     @Column(updatable = false)
@@ -42,7 +49,8 @@ public class User implements UserDetails {
 
     public User() {}
 
-    public User(UUID id, String name, String email, String password, Role role, LocalDateTime createdAt, LocalDateTime updatedAt) {
+    public User(UUID id, String name, String email, String password, Role role,
+                LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.name = name;
         this.email = email;
@@ -50,6 +58,7 @@ public class User implements UserDetails {
         this.role = role != null ? role : Role.ROLE_USER;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.emailVerified = true;
     }
 
     public static Builder builder() {
@@ -60,23 +69,30 @@ public class User implements UserDetails {
         private UUID id;
         private String name;
         private String email;
+        private String googleId;
         private String password;
         private Role role = Role.ROLE_USER;
+        private Boolean emailVerified = true;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
 
         public Builder id(UUID id) { this.id = id; return this; }
         public Builder name(String name) { this.name = name; return this; }
         public Builder email(String email) { this.email = email; return this; }
+        public Builder googleId(String googleId) { this.googleId = googleId; return this; }
         public Builder password(String password) { this.password = password; return this; }
         public Builder role(Role role) { this.role = role; return this; }
+        public Builder emailVerified(Boolean emailVerified) { this.emailVerified = emailVerified; return this; }
         public Builder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
         public Builder updatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
 
         public User build() {
-            return new User(id, name, email, password, role, createdAt, updatedAt);
+    User user = new User(id, name, email, password, role, createdAt, updatedAt);
+    user.setEmailVerified(emailVerified);
+    user.setGoogleId(googleId);
+    return user;
+    }   
         }
-    }
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
@@ -87,11 +103,17 @@ public class User implements UserDetails {
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
 
+    public String getGoogleId() { return googleId; }
+    public void setGoogleId(String googleId) { this.googleId = googleId; }
+
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
 
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }
+
+    public Boolean getEmailVerified() { return emailVerified; }
+    public void setEmailVerified(Boolean emailVerified) { this.emailVerified = emailVerified; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
@@ -119,5 +141,7 @@ public class User implements UserDetails {
     public boolean isCredentialsNonExpired() { return true; }
 
     @Override
-    public boolean isEnabled() { return true; }
+    public boolean isEnabled() {
+        return Boolean.TRUE.equals(emailVerified);
+    }
 }

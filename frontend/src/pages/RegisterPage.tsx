@@ -1,19 +1,29 @@
+
 import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import { authApi } from '../services/api';
-import { TrendingUp, Lock, Mail, User, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import {
+  TrendingUp,
+  Lock,
+  Mail,
+  User,
+  ArrowRight,
+  AlertCircle,
+  Eye,
+  EyeOff,
+  CheckCircle
+} from 'lucide-react';
 
 interface RegisterPageProps {
   onSwitchToLogin: () => void;
 }
 
 export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) => {
-  const { login } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -22,8 +32,8 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
     setIsLoading(true);
 
     try {
-      const response = await authApi.register(name, email, password);
-      login(response.token, response.user);
+      await authApi.register(name, email, password);
+      setSuccess(true);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Falha ao registrar conta. Tente novamente.');
     } finally {
@@ -39,113 +49,145 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
             <TrendingUp className="w-8 h-8 text-white" />
           </div>
         </div>
+
         <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
-          Crie sua Conta
+          {success ? 'Cadastro realizado!' : 'Crie sua Conta'}
         </h2>
+
         <p className="mt-2 text-center text-sm text-slate-400">
-          Inicie sua organização financeira e acompanhe seus investimentos
+          {success
+            ? 'Sua conta foi criada. Falta confirmar seu e-mail para liberar o acesso.'
+            : 'Inicie sua organização financeira e acompanhe seus investimentos'}
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-slate-900 py-8 px-4 shadow-2xl border border-slate-800 sm:rounded-2xl sm:px-10">
-          {error && (
-            <div className="mb-4 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 flex items-center gap-3 text-rose-400 text-sm">
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
 
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            <div>
-              <label className="block text-sm font-medium text-slate-300">
-                Nome completo
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-slate-500" />
-                </div>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Seu nome"
-                  className="block w-full pl-10 pr-3 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                />
-              </div>
-            </div>
+          {success ? (
+            <div className="text-center">
+              <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-5" />
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300">
-                E-mail
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-500" />
-                </div>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seu@email.com"
-                  className="block w-full pl-10 pr-3 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                />
-              </div>
-            </div>
+             <p className="text-slate-300 text-sm leading-relaxed mb-6">
+              Enviamos um link de confirmação para seu e-mail.
+              Verifique sua caixa de entrada e também a pasta de spam
+              para liberar o acesso ao FinanTrack.
+              </p>.
+              
 
-          <div>
-  <label className="block text-sm font-medium text-slate-300">
-    Senha (mínimo 6 caracteres)
-  </label>
-
-  <div className="mt-1 relative rounded-md shadow-sm">
-    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-      <Lock className="h-5 w-5 text-slate-500" />
-    </div>
-
-    <input
-      type={showPassword ? 'text' : 'password'}
-      required
-      minLength={6}
-      value={password}
-      onChange={(e) => setPassword(e.target.value)}
-      placeholder="••••••••"
-      className="block w-full pl-10 pr-10 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-    />
-
-    <button
-      type="button"
-      onClick={() => setShowPassword(!showPassword)}
-      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white cursor-pointer"
-      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-    >
-      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-    </button>
-  </div>
-</div>
-
-            <div>
               <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-lg shadow-emerald-500/20 text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-all cursor-pointer"
+                type="button"
+                onClick={onSwitchToLogin}
+                className="w-full flex justify-center items-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 transition-all cursor-pointer"
               >
-                {isLoading ? 'Cadastrando...' : 'Criar Conta'}
+                Voltar para o login
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
-          </form>
+          ) : (
+            <>
+              {error && (
+                <div className="mb-4 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 flex items-center gap-3 text-rose-400 text-sm">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
 
-          <div className="mt-6 text-center">
-            <button
-              onClick={onSwitchToLogin}
-              className="text-sm font-medium text-blue-400 hover:text-blue-300 cursor-pointer"
-            >
-              Já possui uma conta? Faça login
-            </button>
-          </div>
+              <form className="space-y-5" onSubmit={handleSubmit}>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300">
+                    Nome completo
+                  </label>
+                  <div className="mt-1 relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <User className="h-5 w-5 text-slate-500" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Seu nome"
+                      className="block w-full pl-10 pr-3 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300">
+                    E-mail
+                  </label>
+                  <div className="mt-1 relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Mail className="h-5 w-5 text-slate-500" />
+                    </div>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="seu@email.com"
+                      className="block w-full pl-10 pr-3 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300">
+                    Senha (mínimo 6 caracteres)
+                  </label>
+
+                  <div className="mt-1 relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-slate-500" />
+                    </div>
+
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="block w-full pl-10 pr-10 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white cursor-pointer"
+                      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    >
+                      {showPassword
+                        ? <EyeOff className="h-5 w-5" />
+                        : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-lg shadow-emerald-500/20 text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    {isLoading ? 'Cadastrando...' : 'Criar Conta'}
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-6 text-center">
+                <button
+                  type="button"
+                  onClick={onSwitchToLogin}
+                  className="text-sm font-medium text-blue-400 hover:text-blue-300 cursor-pointer"
+                >
+                  Já possui uma conta? Faça login
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
