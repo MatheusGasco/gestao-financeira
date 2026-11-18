@@ -69,22 +69,19 @@ public class MarketDataService {
         }
 
         try {
-            RestClient restClient = RestClient.builder()
-                    .baseUrl(brapiBaseUrl)
-                    .build();
+           RestClient restClient = RestClient.builder()
+        .baseUrl(brapiBaseUrl)
+        .build();
 
-            BrapiResponse response = restClient.get()
-                    .uri(uriBuilder -> {
-                        var builder = uriBuilder.path("/quote/{ticker}");
-
-                        if (brapiToken != null && !brapiToken.isBlank()) {
-                            builder.queryParam("token", brapiToken);
-                        }
-
-                        return builder.build(cleanTicker);
-                    })
-                    .retrieve()
-                    .body(BrapiResponse.class);
+BrapiResponse response = restClient.get()
+        .uri("/quote/{ticker}", cleanTicker)
+        .headers(headers -> {
+            if (brapiToken != null && !brapiToken.isBlank()) {
+                headers.setBearerAuth(brapiToken.trim());
+            }
+        })
+        .retrieve()
+        .body(BrapiResponse.class);
 
             if (response != null
                     && response.getResults() != null
