@@ -1,7 +1,16 @@
+
 import React, { useState, useEffect } from 'react';
 import { accountsApi } from '../services/api';
 import type { Account, AccountType } from '../types';
-import { Wallet, Plus, Trash2, Landmark, PiggyBank, CircleDollarSign, TrendingUp } from 'lucide-react';
+import {
+  Wallet,
+  Plus,
+  Trash2,
+  Landmark,
+  PiggyBank,
+  CircleDollarSign,
+  TrendingUp,
+} from 'lucide-react';
 
 export const AccountsPage: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -11,7 +20,6 @@ export const AccountsPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [type, setType] = useState<AccountType>('CHECKING');
-  const [initialBalance, setInitialBalance] = useState('0.00');
   const [color, setColor] = useState('#3B82F6');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -37,16 +45,19 @@ export const AccountsPage: React.FC = () => {
 
     try {
       setIsSubmitting(true);
+
       await accountsApi.create({
         name: name.trim(),
         type,
-        initialBalance: parseFloat(initialBalance) || 0,
+        initialBalance: 0,
         color,
       });
 
       setIsModalOpen(false);
       setName('');
-      setInitialBalance('0.00');
+      setType('CHECKING');
+      setColor('#3B82F6');
+
       await loadAccounts();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Erro ao criar conta');
@@ -56,7 +67,7 @@ export const AccountsPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta conta? Todas as transações associadas serão removidas.')) {
+    if (!window.confirm('Tem certeza que deseja excluir esta conta?')) {
       return;
     }
 
@@ -69,7 +80,10 @@ export const AccountsPage: React.FC = () => {
   };
 
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(val);
   };
 
   const getAccountIcon = (accType: AccountType) => {
@@ -87,14 +101,21 @@ export const AccountsPage: React.FC = () => {
 
   const getAccountTypeLabel = (accType: AccountType) => {
     switch (accType) {
-      case 'CHECKING': return 'Conta Corrente';
-      case 'SAVINGS': return 'Poupança';
-      case 'INVESTMENT': return 'Investimentos';
-      case 'CASH': return 'Dinheiro Físico';
+      case 'CHECKING':
+        return 'Conta Corrente';
+      case 'SAVINGS':
+        return 'Poupança';
+      case 'INVESTMENT':
+        return 'Investimentos';
+      case 'CASH':
+        return 'Dinheiro Físico';
     }
   };
 
-  const totalBalance = accounts.reduce((sum, a) => sum + Number(a.balance), 0);
+  const totalBalance = accounts.reduce(
+    (sum, a) => sum + Number(a.balance),
+    0
+  );
 
   return (
     <div className="space-y-8 pb-12">
@@ -135,10 +156,13 @@ export const AccountsPage: React.FC = () => {
 
       {/* Grid de Contas */}
       {isLoading ? (
-        <div className="p-8 text-center text-slate-400">Carregando contas...</div>
+        <div className="p-8 text-center text-slate-400">
+          Carregando contas...
+        </div>
       ) : accounts.length === 0 ? (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-500">
-          Nenhuma conta bancária cadastrada. Clique em "Nova Conta" para cadastrar seu primeiro banco ou carteira.
+          Nenhuma conta bancária cadastrada. Clique em "Nova Conta" para
+          cadastrar seu primeiro banco ou carteira.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -159,8 +183,12 @@ export const AccountsPage: React.FC = () => {
                       {getAccountIcon(acc.type)}
                     </div>
                     <div>
-                      <h3 className="font-bold text-white text-base">{acc.name}</h3>
-                      <span className="text-xs text-slate-400">{getAccountTypeLabel(acc.type)}</span>
+                      <h3 className="font-bold text-white text-base">
+                        {acc.name}
+                      </h3>
+                      <span className="text-xs text-slate-400">
+                        {getAccountTypeLabel(acc.type)}
+                      </span>
                     </div>
                   </div>
 
@@ -183,7 +211,10 @@ export const AccountsPage: React.FC = () => {
 
               <div className="mt-6 pt-3 border-t border-slate-800 text-[11px] text-slate-500 flex justify-between">
                 <span>Moeda: {acc.currency}</span>
-                <span>Criada em {new Date(acc.createdAt).toLocaleDateString('pt-BR')}</span>
+                <span>
+                  Criada em{' '}
+                  {new Date(acc.createdAt).toLocaleDateString('pt-BR')}
+                </span>
               </div>
             </div>
           ))}
@@ -194,7 +225,9 @@ export const AccountsPage: React.FC = () => {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
-            <h2 className="text-xl font-bold text-white mb-4">Nova Conta Financeira</h2>
+            <h2 className="text-xl font-bold text-white mb-4">
+              Nova Conta Financeira
+            </h2>
 
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
@@ -204,9 +237,9 @@ export const AccountsPage: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Nubank, Itaú Corrente, Carteira"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  placeholder="Ex.: Conta Itaú"
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
@@ -217,28 +250,18 @@ export const AccountsPage: React.FC = () => {
                 </label>
                 <select
                   value={type}
-                  onChange={(e) => setType(e.target.value as AccountType)}
+                  onChange={(e) =>
+                    setType(e.target.value as AccountType)
+                  }
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="CHECKING">Conta Corrente</option>
                   <option value="SAVINGS">Poupança</option>
-                  <option value="INVESTMENT">Corretora / Investimentos</option>
+                  <option value="INVESTMENT">
+                    Corretora / Investimentos
+                  </option>
                   <option value="CASH">Dinheiro Físico</option>
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">
-                  Saldo Inicial (R$)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={initialBalance}
-                  onChange={(e) => setInitialBalance(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
               </div>
 
               <div>
