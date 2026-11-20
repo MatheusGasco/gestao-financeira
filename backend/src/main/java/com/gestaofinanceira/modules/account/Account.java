@@ -36,6 +36,9 @@ public class Account {
     @Column(length = 20)
     private String color = "#3B82F6";
 
+    @Column(nullable = false)
+    private boolean archived = false;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
@@ -101,7 +104,12 @@ public class Account {
 
     public String getColor() { return color; }
     public void setColor(String color) { this.color = color; }
+   
+    public boolean isArchived() { return archived; }
+    public void setArchived(boolean archived) { this.archived = archived; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
+
+

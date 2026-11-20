@@ -1,5 +1,8 @@
 package com.gestaofinanceira.modules.account;
 
+
+import com.gestaofinanceira.modules.transaction.TransactionRepository;
+import com.gestaofinanceira.modules.investment.InvestmentTransactionRepository;
 import com.gestaofinanceira.modules.user.User;
 import com.gestaofinanceira.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
@@ -14,16 +17,24 @@ import java.util.stream.Collectors;
 public class AccountService {
 
     private final AccountRepository accountRepository;
+    private final TransactionRepository transactionRepository;
+    private final InvestmentTransactionRepository investmentTransactionRepository;
 
-    public AccountService(AccountRepository accountRepository) {
-        this.accountRepository = accountRepository;
+   public AccountService(
+        AccountRepository accountRepository,
+        TransactionRepository transactionRepository,
+        InvestmentTransactionRepository investmentTransactionRepository) 
+    
+    {
+    this.accountRepository = accountRepository;
+    this.transactionRepository = transactionRepository;
+    this.investmentTransactionRepository = investmentTransactionRepository;
+
     }
 
     public List<AccountDTO.Response> listByUser(User user) {
-        return accountRepository.findByUserOrderByCreatedAtAsc(user)
-                .stream()
-                .map(AccountDTO.Response::fromEntity)
-                .collect(Collectors.toList());
+        return accountRepository.findByUserAndArchivedFalseOrderByCreatedAtAsc(user)
+            .stream().map(AccountDTO.Response::fromEntity).collect(Collectors.toList());
     }
 
     public Account findEntityByIdAndUser(UUID id, User user) {
@@ -31,6 +42,15 @@ public class AccountService {
                 .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada: " + id));
     }
 
+    public Account findActiveEntityByIdAndUser(UUID id, User user) {
+        Account account = findActiveEntityByIdAndUser(id, user);
+
+        if (account.isArchived()) {
+             throw new ResourceNotFoundException("Esta conta está arquivada e não pode receber novas movimentações.");
+    }
+ 
+       return account;
+    }
     @Transactional
     public AccountDTO.Response create(AccountDTO.Request request, User user) {
         BigDecimal balance = request.getInitialBalance() != null ? request.getInitialBalance() : BigDecimal.ZERO;
@@ -52,7 +72,7 @@ public class AccountService {
 
     @Transactional
     public AccountDTO.Response update(UUID id, AccountDTO.Request request, User user) {
-        Account account = findEntityByIdAndUser(id, user);
+        Account account = findActiveEntityByIdAndUser(id, user);
 
         account.setName(request.getName().trim());
         account.setType(request.getType());
@@ -68,8 +88,23 @@ public class AccountService {
     }
 
     @Transactional
-    public void delete(UUID id, User user) {
-        Account account = findEntityByIdAndUser(id, user);
+public void delete(UUID id, User user) {
+    Account account = findEntityByIdAndUser(id, user);
+
+    boolean hasTransactions =
+            transactionRepository.existsByAccount_Id(id)
+            || transactionRepository.existsByDestinationAccount_Id(id);
+
+    boolean hasInvestmentTransactions =
+            investmentTransactionRepository.existsByAccount_Id(id);
+
+    if (hasTransactions || hasInvestmentTransactions) {
+        account.setArchived(true);
+        accountRepository.save(account);
+    } else {
         accountRepository.delete(account);
     }
+
+}
+
 }

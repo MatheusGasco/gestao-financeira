@@ -56,7 +56,7 @@ public class TransactionService {
 
     @Transactional
     public TransactionDTO.Response create(TransactionDTO.Request request, User user) {
-        Account account = accountService.findEntityByIdAndUser(request.getAccountId(), user);
+        Account account = accountService.findActiveEntityByIdAndUser(request.getAccountId(), user);
 
         Account destinationAccount = null;
         if (request.getType() == TransactionType.TRANSFER) {
@@ -66,7 +66,7 @@ public class TransactionService {
             if (request.getAccountId().equals(request.getDestinationAccountId())) {
                 throw new BusinessException("A conta de origem e destino não podem ser as mesmas.");
             }
-            destinationAccount = accountService.findEntityByIdAndUser(request.getDestinationAccountId(), user);
+            destinationAccount = accountService.findActiveEntityByIdAndUser(request.getDestinationAccountId(), user);
         }
 
         Category category = null;

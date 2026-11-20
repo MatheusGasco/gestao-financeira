@@ -44,7 +44,7 @@ public class InvestmentService {
     public InvestmentDTO.OrderResponse recordOrder(InvestmentDTO.OrderRequest request, User user) {
         String ticker = request.getTicker().trim().toUpperCase();
 
-        Account account = accountService.findEntityByIdAndUser(request.getAccountId(), user);
+        Account account = accountService.findActiveEntityByIdAndUser(request.getAccountId(), user);
 
         // Buscar cotação e garantir existência do ativo
         MarketQuoteDTO quote = marketDataService.getQuote(ticker);
@@ -98,72 +98,111 @@ public class InvestmentService {
                 .collect(Collectors.toList());
     }
 
-    public List<InvestmentDTO.PositionResponse> getPortfolioPositions(User user) {
-        List<InvestmentTransaction> transactions = investmentRepository.findByUserOrderByTransactionDateAscCreatedAtAsc(user);
+    
+public List<InvestmentDTO.PositionResponse> getPortfolioPositions(User user) {
+    List<InvestmentTransaction> transactions =
+            investmentRepository.findByUserOrderByTransactionDateAscCreatedAtAsc(user);
 
-        // Agrupar por ativo mantendo ordem cronológica
-        Map<Asset, List<InvestmentTransaction>> groupedByAsset = new LinkedHashMap<>();
-        for (InvestmentTransaction t : transactions) {
-            groupedByAsset.computeIfAbsent(t.getAsset(), k -> new ArrayList<>()).add(t);
-        }
+    Map<Asset, List<InvestmentTransaction>> groupedByAsset = new LinkedHashMap<>();
 
-        List<InvestmentDTO.PositionResponse> positions = new ArrayList<>();
+    for (InvestmentTransaction t : transactions) {
+        groupedByAsset.computeIfAbsent(t.getAsset(), k -> new ArrayList<>()).add(t);
+    }
 
-        for (Map.Entry<Asset, List<InvestmentTransaction>> entry : groupedByAsset.entrySet()) {
-            Asset asset = entry.getKey();
-            List<InvestmentTransaction> assetTransactions = entry.getValue();
+    List<InvestmentDTO.PositionResponse> positions = new ArrayList<>();
 
-            BigDecimal currentQty = BigDecimal.ZERO;
-            BigDecimal totalCost = BigDecimal.ZERO;
+    for (Map.Entry<Asset, List<InvestmentTransaction>> entry : groupedByAsset.entrySet()) {
+        Asset asset = entry.getKey();
+        List<InvestmentTransaction> assetTransactions = entry.getValue();
 
-            for (InvestmentTransaction t : assetTransactions) {
-                if (t.getType() == InvestmentTransactionType.BUY) {
-                    BigDecimal buyCost = t.getQuantity().multiply(t.getUnitPrice()).add(t.getFees());
-                    totalCost = totalCost.add(buyCost);
-                    currentQty = currentQty.add(t.getQuantity());
-                } else if (t.getType() == InvestmentTransactionType.SELL) {
-                    BigDecimal avgPrice = currentQty.compareTo(BigDecimal.ZERO) > 0
-                            ? totalCost.divide(currentQty, 6, RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO;
-                    currentQty = currentQty.subtract(t.getQuantity());
+        BigDecimal currentQty = BigDecimal.ZERO;
+        BigDecimal totalCost = BigDecimal.ZERO;
 
-                    if (currentQty.compareTo(BigDecimal.ZERO) <= 0) {
-                        currentQty = BigDecimal.ZERO;
-                        totalCost = BigDecimal.ZERO;
-                    } else {
-                        totalCost = avgPrice.multiply(currentQty);
-                    }
-                }
-            }
+        for (InvestmentTransaction t : assetTransactions) {
+            if (t.getType() == InvestmentTransactionType.BUY) {
+                BigDecimal buyCost = t.getQuantity()
+                        .multiply(t.getUnitPrice())
+                        .add(t.getFees());
 
-            if (currentQty.compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal averagePrice = totalCost.divide(currentQty, 4, RoundingMode.HALF_UP);
-                BigDecimal currentPrice = asset.getCurrentPrice() != null ? asset.getCurrentPrice() : averagePrice;
-                BigDecimal currentValue = currentQty.multiply(currentPrice).setScale(2, RoundingMode.HALF_UP);
-                BigDecimal profitLoss = currentValue.subtract(totalCost).setScale(2, RoundingMode.HALF_UP);
-                BigDecimal profitLossPercentage = totalCost.compareTo(BigDecimal.ZERO) > 0
-                        ? profitLoss.divide(totalCost, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP)
+                totalCost = totalCost.add(buyCost);
+                currentQty = currentQty.add(t.getQuantity());
+
+            } else if (t.getType() == InvestmentTransactionType.SELL) {
+                BigDecimal avgPrice = currentQty.compareTo(BigDecimal.ZERO) > 0
+                        ? totalCost.divide(currentQty, 6, RoundingMode.HALF_UP)
                         : BigDecimal.ZERO;
 
-                positions.add(InvestmentDTO.PositionResponse.builder()
-                        .assetId(asset.getId())
-                        .ticker(asset.getTicker())
-                        .name(asset.getName())
-                        .type(asset.getType())
-                        .quantity(currentQty.setScale(4, RoundingMode.HALF_UP))
-                        .averagePrice(averagePrice.setScale(2, RoundingMode.HALF_UP))
-                        .totalCost(totalCost.setScale(2, RoundingMode.HALF_UP))
-                        .currentPrice(currentPrice.setScale(2, RoundingMode.HALF_UP))
-                        .currentValue(currentValue)
-                        .profitLoss(profitLoss)
-                        .profitLossPercentage(profitLossPercentage)
-                        .dailyChangePercentage(asset.getDailyChangePercentage() != null ? asset.getDailyChangePercentage() : BigDecimal.ZERO)
-                        .build());
+                currentQty = currentQty.subtract(t.getQuantity());
+
+                if (currentQty.compareTo(BigDecimal.ZERO) <= 0) {
+                    currentQty = BigDecimal.ZERO;
+                    totalCost = BigDecimal.ZERO;
+                } else {
+                    totalCost = avgPrice.multiply(currentQty);
+                }
             }
         }
 
-        return positions;
+        if (currentQty.compareTo(BigDecimal.ZERO) <= 0) {
+            continue;
+        }
+
+        // Atualiza a cotação usando o serviço existente da Brapi.
+        try {
+            marketDataService.getQuote(asset.getTicker());
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            // Mantém a última cotação armazenada se a consulta falhar.
+        }
+
+        BigDecimal averagePrice = totalCost.divide(
+                currentQty, 4, RoundingMode.HALF_UP
+        );
+
+        BigDecimal currentPrice = assetRepository
+                .findByTickerIgnoreCase(asset.getTicker())
+                .map(Asset::getCurrentPrice)
+                .filter(price -> price.compareTo(BigDecimal.ZERO) > 0)
+                .orElse(averagePrice);
+
+        BigDecimal currentValue = currentQty.multiply(currentPrice)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal profitLoss = currentValue.subtract(totalCost)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal profitLossPercentage = totalCost.compareTo(BigDecimal.ZERO) > 0
+                ? profitLoss.divide(totalCost, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100))
+                    .setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        Asset updatedAsset = assetRepository
+                .findByTickerIgnoreCase(asset.getTicker())
+                .orElse(asset);
+
+        positions.add(InvestmentDTO.PositionResponse.builder()
+                .assetId(updatedAsset.getId())
+                .ticker(updatedAsset.getTicker())
+                .name(updatedAsset.getName())
+                .type(updatedAsset.getType())
+                .quantity(currentQty.setScale(4, RoundingMode.HALF_UP))
+                .averagePrice(averagePrice.setScale(2, RoundingMode.HALF_UP))
+                .totalCost(totalCost.setScale(2, RoundingMode.HALF_UP))
+                .currentPrice(currentPrice.setScale(2, RoundingMode.HALF_UP))
+                .currentValue(currentValue)
+                .profitLoss(profitLoss)
+                .profitLossPercentage(profitLossPercentage)
+                .dailyChangePercentage(
+                        updatedAsset.getDailyChangePercentage() != null
+                                ? updatedAsset.getDailyChangePercentage()
+                                : BigDecimal.ZERO
+                )
+                .build());
     }
+
+    return positions;
+}
+
 
     private BigDecimal getCurrentCustodyQuantity(User user, Asset asset) {
         List<InvestmentTransaction> txs = investmentRepository.findByUserAndAssetOrderByTransactionDateAscCreatedAtAsc(user, asset);

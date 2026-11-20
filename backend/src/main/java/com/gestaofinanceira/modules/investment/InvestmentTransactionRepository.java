@@ -13,4 +13,5 @@ public interface InvestmentTransactionRepository extends JpaRepository<Investmen
     List<InvestmentTransaction> findByUserOrderByTransactionDateAscCreatedAtAsc(User user);
     List<InvestmentTransaction> findByUserAndAssetOrderByTransactionDateAscCreatedAtAsc(User user, Asset asset);
     List<InvestmentTransaction> findByUserOrderByTransactionDateDescCreatedAtDesc(User user);
+    boolean existsByAccount_Id(UUID accountId);
 }

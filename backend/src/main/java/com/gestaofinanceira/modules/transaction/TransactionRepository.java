@@ -33,4 +33,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     List<Transaction> findByUserAndTransactionDateBetween(User user, LocalDate start, LocalDate end);
 
     Optional<Transaction> findByIdAndUser(UUID id, User user);
+  
+    boolean existsByAccount_Id(UUID accountId);
+
+    boolean existsByDestinationAccount_Id(UUID accountId);
 }
