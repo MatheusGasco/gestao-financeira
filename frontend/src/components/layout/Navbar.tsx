@@ -1,13 +1,25 @@
+
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { LayoutDashboard, Receipt, TrendingUp, Wallet, LogOut, User as UserIcon } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Receipt,
+  TrendingUp,
+  Wallet,
+  LogOut,
+  User as UserIcon,
+  BriefcaseBusiness,
+} from 'lucide-react';
 
 interface NavbarProps {
   currentTab: string;
   onTabChange: (tab: string) => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  currentTab,
+  onTabChange,
+}) => {
   const { user, logout } = useAuth();
 
   const navItems = [
@@ -15,6 +27,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
     { id: 'transactions', label: 'Transações', icon: Receipt },
     { id: 'investments', label: 'Investimentos', icon: TrendingUp },
     { id: 'accounts', label: 'Contas', icon: Wallet },
+    { id: 'consultoria', label: 'Consultoria', icon: BriefcaseBusiness },
   ];
 
   return (
@@ -26,10 +39,12 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-blue-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
                 <TrendingUp className="w-5 h-5 text-white" />
               </div>
+
               <div>
                 <span className="text-lg font-bold bg-gradient-to-r from-white via-slate-200 to-emerald-400 bg-clip-text text-transparent">
                   FinanTrack
                 </span>
+
                 <span className="hidden sm:inline-block ml-2 text-xs uppercase tracking-wider font-semibold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">
                   B3 & Finanças
                 </span>
@@ -40,6 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const active = currentTab === item.id;
+
                 return (
                   <button
                     key={item.id}
@@ -61,7 +77,9 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
           <div className="flex items-center gap-4">
             <div className="hidden sm:flex items-center gap-2 bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-700/60">
               <UserIcon className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm font-medium text-slate-200">{user?.name}</span>
+              <span className="text-sm font-medium text-slate-200">
+                {user?.name}
+              </span>
             </div>
 
             <button
@@ -74,16 +92,17 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onTabChange }) => {
           </div>
         </div>
 
-        {/* Mobile menu bar */}
+        {/* Menu para dispositivos móveis */}
         <div className="md:hidden flex justify-around py-2 border-t border-slate-800/60">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = currentTab === item.id;
+
             return (
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
-                className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-xs font-medium ${
+                className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg text-xs font-medium ${
                   active ? 'text-blue-400' : 'text-slate-400'
                 }`}
               >

@@ -10,6 +10,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { InvestmentsPage } from './pages/InvestmentsPage';
 import { AccountsPage } from './pages/AccountsPage';
+import { ConsultoriaPage } from './pages/ConsultoriaPage';
 import { PasswordResetPage } from './pages/PasswordResetPage';
 
 import {
@@ -23,11 +24,14 @@ import {
 const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
 
-  const [authView, setAuthView] = useState<'login' | 'register' | 'password-reset'>('login');
+  const [authView, setAuthView] = useState<
+    'login' | 'register' | 'password-reset'
+  >('login');
 
-const [resetToken] = useState<string | null>(() => {
-  return new URLSearchParams(window.location.search).get('resetToken');
-});
+  const [resetToken] = useState<string | null>(() => {
+    return new URLSearchParams(window.location.search).get('resetToken');
+  });
+
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
 
   const [verificationToken] = useState<string | null>(() => {
@@ -82,7 +86,6 @@ const [resetToken] = useState<string | null>(() => {
   if (verificationToken) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="flex justify-center">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-blue-600 flex items-center justify-center shadow-xl shadow-emerald-500/20">
@@ -101,7 +104,6 @@ const [resetToken] = useState<string | null>(() => {
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           <div className="bg-slate-900 py-8 px-6 shadow-2xl border border-slate-800 sm:rounded-2xl sm:px-10 text-center">
-
             {verificationSuccess ? (
               <>
                 <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-5" />
@@ -157,14 +159,13 @@ const [resetToken] = useState<string | null>(() => {
                 </button>
               </>
             )}
-
           </div>
         </div>
       </div>
     );
   }
 
-    if (resetToken) {
+  if (resetToken) {
     return (
       <PasswordResetPage
         token={resetToken}
@@ -172,7 +173,8 @@ const [resetToken] = useState<string | null>(() => {
       />
     );
   }
-    if (isLoading) {
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -185,7 +187,7 @@ const [resetToken] = useState<string | null>(() => {
     );
   }
 
-   if (!isAuthenticated) {
+  if (!isAuthenticated) {
     if (authView === 'password-reset') {
       return (
         <PasswordResetPage
@@ -209,7 +211,6 @@ const [resetToken] = useState<string | null>(() => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-
       <Navbar
         currentTab={currentTab}
         onTabChange={setCurrentTab}
@@ -223,8 +224,9 @@ const [resetToken] = useState<string | null>(() => {
         {currentTab === 'investments' && <InvestmentsPage />}
 
         {currentTab === 'accounts' && <AccountsPage />}
-      </main>
 
+        {currentTab === 'consultoria' && <ConsultoriaPage />}
+      </main>
     </div>
   );
 };
