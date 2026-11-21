@@ -1,10 +1,9 @@
 
 import React, { useState } from 'react';
 import {
-  
   Target,
   CalendarDays,
-    MessageCircle,
+  MessageCircle,
   ArrowRight,
   User,
   GraduationCap,
@@ -12,29 +11,56 @@ import {
   ShieldCheck,
   Send,
 } from 'lucide-react';
+import { api } from '../services/api';
 
 export const ConsultoriaPage: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
-   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const subject = encodeURIComponent(
-      'Solicitação de consultoria financeira'
-    );
+    if (isSubmitting) return;
 
-    const body = encodeURIComponent(
-      `Nome: ${name}\n` +
-      `E-mail: ${email}\n` +
-      `Telefone: ${phone}\n` +
-      `Mensagem:\n${message}`
-    );
+    setIsSubmitting(true);
+    setFeedback(null);
 
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    try {
+      const response = await api.post<{ message: string }>(
+        '/consultations',
+        {
+          name,
+          email,
+          phone,
+          message,
+        }
+      );
+
+      setFeedback({
+        type: 'success',
+        message: response.data.message,
+      });
+
+      setName('');
+      setEmail('');
+      setPhone('');
+      setMessage('');
+
+    } catch {
+      setFeedback({
+        type: 'error',
+        message: 'Não foi possível enviar sua solicitação. Tente novamente em alguns instantes.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -92,7 +118,7 @@ export const ConsultoriaPage: React.FC = () => {
           </div>
 
           <p className="text-slate-300 leading-relaxed">
-             Me chamo Matheus Gasco, sou formado em Ciências Econômicas e
+            Me chamo Matheus Gasco, sou formado em Ciências Econômicas e
             pós-graduado em Mercado Financeiro. Criei esta ferramenta para
             ajudar você a cuidar melhor da sua vida financeira, desde a
             organização das contas e dos boletos até o planejamento da sua
@@ -101,7 +127,7 @@ export const ConsultoriaPage: React.FC = () => {
           </p>
 
           <p className="mt-4 text-slate-300 leading-relaxed">
-             Nosso primeiro contato é gratuito! Vamos conversar, entender
+            Nosso primeiro contato é gratuito! Vamos conversar, entender
             suas necessidades e descobrir juntos como posso ajudar você
             a alcançar seus objetivos financeiros.
           </p>
@@ -149,7 +175,6 @@ export const ConsultoriaPage: React.FC = () => {
         </div>
       </section>
 
-      
       {/* Etapas */}
       <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 sm:p-8">
         <h2 className="text-2xl font-bold text-white">
@@ -205,6 +230,7 @@ export const ConsultoriaPage: React.FC = () => {
               </label>
               <input
                 required
+                maxLength={100}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Seu nome"
@@ -219,6 +245,7 @@ export const ConsultoriaPage: React.FC = () => {
               <input
                 required
                 type="email"
+                maxLength={150}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="seu@email.com"
@@ -231,6 +258,9 @@ export const ConsultoriaPage: React.FC = () => {
                 Telefone / WhatsApp
               </label>
               <input
+                required
+                type="tel"
+                maxLength={30}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="(00) 00000-0000"
@@ -239,12 +269,13 @@ export const ConsultoriaPage: React.FC = () => {
             </div>
           </div>
 
-     
           <div>
             <label className="mb-2 block text-sm text-slate-300">
               Conte um pouco sobre seus objetivos
             </label>
             <textarea
+              required
+              maxLength={3000}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={4}
@@ -253,17 +284,31 @@ export const ConsultoriaPage: React.FC = () => {
             />
           </div>
 
+          {feedback && (
+            <div
+              role="status"
+              aria-live="polite"
+              className={`rounded-xl border p-4 text-sm ${
+                feedback.type === 'success'
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                  : 'border-red-500/30 bg-red-500/10 text-red-400'
+              }`}
+            >
+              {feedback.message}
+            </div>
+          )}
+
           <button
             type="submit"
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-emerald-600 px-6 py-3 font-semibold text-white transition hover:from-blue-500 hover:to-emerald-500"
+            disabled={isSubmitting}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-emerald-600 px-6 py-3 font-semibold text-white transition hover:from-blue-500 hover:to-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Send className="w-4 h-4" />
-            Preparar solicitação por e-mail
+            {isSubmitting ? 'Enviando solicitação...' : 'Solicitar consultoria'}
           </button>
 
           <p className="text-xs text-slate-500">
-            O envio abrirá o aplicativo de e-mail configurado no seu dispositivo.
-            O endereço de destino será configurado posteriormente.
+            Seus dados serão enviados diretamente para nossa equipe de consultoria.
           </p>
         </form>
       </section>

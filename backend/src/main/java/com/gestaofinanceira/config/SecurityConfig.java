@@ -42,10 +42,11 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                     
+                       .requestMatchers(
+
         "/",
         "/api/auth/**",
+        "/api/consultations/**",
         "/v3/api-docs/**",
         "/swagger-ui/**",
         "/swagger-ui.html"
