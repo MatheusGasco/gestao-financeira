@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { authApi } from './services/api';
 
@@ -23,6 +23,19 @@ import {
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+  return (localStorage.getItem('finantrack-theme') as 'dark' | 'light') || 'dark';
+});
+
+useEffect(() => {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('finantrack-theme', theme);
+}, [theme]);
+
+const handleToggleTheme = () => {
+  setTheme((current) => current === 'dark' ? 'light' : 'dark');
+};
 
   const [authView, setAuthView] = useState<
     'login' | 'register' | 'password-reset'
@@ -212,9 +225,11 @@ const AppContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       <Navbar
-        currentTab={currentTab}
-        onTabChange={setCurrentTab}
-      />
+  currentTab={currentTab}
+  onTabChange={setCurrentTab}
+  theme={theme}
+  onToggleTheme={handleToggleTheme}
+/>
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8">
         {currentTab === 'dashboard' && <DashboardPage />}
