@@ -157,7 +157,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <UserIcon className="w-4 h-4 text-emerald-400" />
 
                   <span className="text-sm font-medium text-slate-200 max-w-[150px] sm:max-w-none truncate">
-                    {user?.name}
+                    {user?.name?.trim().split(/\s+/)[0]}
                   </span>
 
                   <ChevronDown
