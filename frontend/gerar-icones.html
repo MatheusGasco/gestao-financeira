@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Gerador de ícones FinanTrack</title>
+  <style>
+    body { font-family: Arial; padding: 30px; background: #0b1628; color: white; }
+    button { padding: 12px; margin: 8px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>Gerador de ícones FinanTrack</h2>
+  <p>Selecione o arquivo public/favicon.png:</p>
+  <input type="file" id="file" accept="image/png">
+  <div id="buttons"></div>
+
+  <script>
+    const input = document.getElementById('file');
+    const buttons = document.getElementById('buttons');
+
+    input.addEventListener('change', () => {
+      const file = input.files[0];
+      if (!file) return;
+
+      const image = new Image();
+      image.onload = () => {
+        buttons.innerHTML = '';
+
+        [192, 512, 180].forEach(size => {
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+
+          const ctx = canvas.getContext('2d');
+          const scale = Math.min(size * 0.86 / image.width, size * 0.86 / image.height);
+          const width = image.width * scale;
+          const height = image.height * scale;
+
+          ctx.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
+
+          const button = document.createElement('button');
+          const name = size === 180 ? 'apple-touch-icon.png' : `icon-${size}.png`;
+          button.textContent = `Baixar ${name}`;
+
+          button.onclick = () => {
+            canvas.toBlob(blob => {
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = name;
+              link.click();
+              URL.revokeObjectURL(url);
+            }, 'image/png');
+          };
+
+          buttons.appendChild(button);
+        });
+      };
+
+      image.src = URL.createObjectURL(file);
+    });
+  </script>
+</body>
+</html>

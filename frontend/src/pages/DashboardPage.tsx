@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dashboardApi, transactionsApi } from '../services/api';
@@ -151,7 +152,7 @@ export const DashboardPage: React.FC = () => {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Patrimônio Total */}
-        <div className="bg-gradient-to-br from-slate-900 to-slate-850 p-6 rounded-2xl border border-slate-800 shadow-lg relative overflow-hidden">
+        <div className="bg-gradient-to-br from-slate-900 to-slate-850 p-4 sm:p-6 rounded-2xl border border-slate-800 shadow-lg relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-10">
             <DollarSign className="w-20 h-20 text-emerald-400" />
           </div>
@@ -162,7 +163,7 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div className="mt-4">
-            <span className="text-2xl lg:text-3xl font-extrabold text-white">
+            <span className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white">
               {formatCurrency(summary.totalNetWorth)}
             </span>
           </div>
@@ -172,7 +173,7 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         {/* Saldo Disponível */}
-        <div className="bg-gradient-to-br from-slate-900 to-slate-850 p-6 rounded-2xl border border-slate-800 shadow-lg relative overflow-hidden">
+        <div className="bg-gradient-to-br from-slate-900 to-slate-850 p-4 sm:p-6 rounded-2xl border border-slate-800 shadow-lg relative overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Saldo Disponível</span>
             <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
@@ -180,7 +181,7 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div className="mt-4">
-            <span className="text-2xl lg:text-3xl font-extrabold text-white">
+            <span className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white">
               {formatCurrency(summary.availableBalance)}
             </span>
           </div>
@@ -190,7 +191,7 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         {/* Investimentos */}
-        <div className="bg-gradient-to-br from-slate-900 to-slate-850 p-6 rounded-2xl border border-slate-800 shadow-lg relative overflow-hidden">
+        <div className="bg-gradient-to-br from-slate-900 to-slate-850 p-4 sm:p-6 rounded-2xl border border-slate-800 shadow-lg relative overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Investimentos B3</span>
             <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
@@ -198,7 +199,7 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div className="mt-4">
-            <span className="text-2xl lg:text-3xl font-extrabold text-white">
+            <span className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white">
               {formatCurrency(summary.investedBalance)}
             </span>
           </div>
@@ -210,7 +211,7 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         {/* Resultado do Mês */}
-        <div className="bg-gradient-to-br from-slate-900 to-slate-850 p-6 rounded-2xl border border-slate-800 shadow-lg relative overflow-hidden">
+        <div className="bg-gradient-to-br from-slate-900 to-slate-850 p-4 sm:p-6 rounded-2xl border border-slate-800 shadow-lg relative overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Resultado do Mês</span>
             <div className={`p-2 rounded-xl border ${summary.monthlyResult >= 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
@@ -218,7 +219,7 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div className="mt-4">
-            <span className={`text-2xl lg:text-3xl font-extrabold ${summary.monthlyResult >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+            <span className={`text-xl sm:text-2xl lg:text-3xl font-extrabold ${summary.monthlyResult >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               {formatCurrency(summary.monthlyResult)}
             </span>
           </div>
@@ -276,7 +277,7 @@ export const DashboardPage: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Gráfico 1: Débitos / Gastos por Categoria */}
-          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-md flex flex-col justify-between">
+          <div className="bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-800 shadow-md flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -345,7 +346,7 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           {/* Gráfico 2: Créditos / Receitas por Categoria */}
-          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-md flex flex-col justify-between">
+          <div className="bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-800 shadow-md flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -418,7 +419,7 @@ export const DashboardPage: React.FC = () => {
       {/* Tables Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Minha Carteira Preview */}
-        <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-md">
+        <div className="bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-800 shadow-md">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-emerald-400" />
@@ -462,7 +463,7 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         {/* Últimas Transações */}
-        <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-md">
+        <div className="bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-800 shadow-md">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <Wallet className="w-5 h-5 text-blue-400" />

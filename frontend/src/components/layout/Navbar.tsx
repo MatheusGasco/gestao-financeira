@@ -223,7 +223,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          <div className="md:hidden flex justify-around py-2 border-t border-slate-800/60">
+          <div className="md:hidden flex w-full items-stretch justify-between gap-1 py-2 px-1 border-t border-slate-800/60">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = currentTab === item.id;
@@ -232,7 +232,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   key={item.id}
                   onClick={() => onTabChange(item.id)}
-                  className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg text-xs font-medium ${
+                  className={`flex flex-1 min-w-0 flex-col items-center justify-center gap-1 py-1 px-0.5 rounded-lg text-[11px] leading-tight text-center font-medium ${
                     active ? 'text-blue-400' : 'text-slate-400'
                   }`}
                 >
